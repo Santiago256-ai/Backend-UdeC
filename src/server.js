@@ -18,6 +18,11 @@ app.use(express.json());
 // 🟢 Servir archivos estáticos
 app.use("/uploads", express.static(path.join(path.resolve(), "src", "uploads")));
 
+// 🟣 Ruta raíz para evitar "Cannot GET /"
+app.get("/", (req, res) => {
+  res.send("Backend UdeC API funcionando 🚀");
+});
+
 // 🔵 Ruta de prueba con base de datos
 app.get("/users", async (req, res) => {
   try {
@@ -36,7 +41,7 @@ app.use("/api/empresas", empresaRoutes);
 app.use("/api/estudiantes", estudianteRoutes);
 
 // 🚀 Iniciar servidor
-const PORT = process.env.PORT || 4000;
-app.listen(PORT, () =>
-  console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`)
-);
+const PORT = process.env.PORT || 8080; // Railway usa PORT dinámico
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
+});

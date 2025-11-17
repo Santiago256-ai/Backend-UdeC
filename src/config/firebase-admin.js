@@ -1,20 +1,30 @@
 // backend/src/config/firebase-admin.js
 
-// 1. Usar sintaxis 'import' en lugar de 'require'
 import admin from 'firebase-admin';
 
-// 2. Importar el archivo JSON de credenciales de servicio de forma segura
-// Nota: La ruta debe ser correcta. Si el archivo está en 'backend/', esta ruta lo alcanza:
-// Después (compatible con Node.js 22+):
-import serviceAccount from '../../service-account-key.json' with { type: "json" };
+// 1. Obtener las credenciales desde la variable de entorno
+const serviceAccountKey = process.env.FIREBASE_ADMIN_CREDENTIALS;
 
+let credentials;
+
+try {
+    if (!serviceAccountKey) {
+        throw new Error("FIREBASE_ADMIN_CREDENTIALS environment variable is not set.");
+    }
+    // 2. Parsear el string JSON a un objeto (esto es necesario en producción)
+    credentials = JSON.parse(serviceAccountKey); 
+} catch (error) {
+    console.error("Error parsing Firebase credentials:", error.message);
+    // Si falla, el servicio no iniciará, lo cual es correcto por seguridad.
+    process.exit(1); 
+}
 
 // Inicializa Firebase Admin solo si no ha sido inicializado ya
 if (!admin.apps.length) {
     admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
+        // Usar el objeto parseado para inicializar
+        credential: admin.credential.cert(credentials) 
     });
 }
 
-// 3. Usar sintaxis 'export default' en lugar de 'module.exports'
 export default admin;

@@ -13,39 +13,27 @@ import pool from "./database.js";
 
 const app = express();
 
-// --- CONFIGURACIÓN CORS CORREGIDA ---
-
-// 1. Definir los orígenes permitidos
-const allowedOrigins = [
-    'https://frontend-ude-c.vercel.app', // Dominio de producción de tu Frontend
-    'http://localhost:3000',             // Desarrollo (React/Vue/etc. común)
-    'http://localhost:5173'              // Desarrollo (Vite común)
-    // Agrega cualquier otro origen donde puedas probar tu Frontend
-];
+// --- CONFIGURACIÓN CORS CORREGIDA (Abierto para el dominio de Vercel) ---
 
 const corsOptions = {
-    origin: (origin, callback) => {
-        // Permitir peticiones sin origen (ej. Postman, requests internos de Railway)
-        if (!origin) return callback(null, true); 
-        
-        if (allowedOrigins.indexOf(origin) !== -1) {
-            // Origen de la lista blanca permitido
-            callback(null, true);
-        } else {
-            // Origen no permitido
-            console.log(`CORS Error: Origin ${origin} is not allowed.`);
-            callback(new Error('Not allowed by CORS'), false);
-        }
-    },
+    // Usar una función para manejar el origen y permitir múltiples dominios.
+    // **OPCIÓN MÁS SENCILLA Y FUNCIONAL EN PRODUCCIÓN:**
+    origin: ['https://frontend-ude-c.vercel.app', 'http://localhost:3000', 'http://localhost:5173'],
+    
+    // Opcional: Si la opción de arriba no funciona, usa el comodín para todo:
+    // origin: '*', 
+    // Si usas '*', debes añadir la siguiente línea para que funcione con credenciales
+    // allowedHeaders: ['Content-Type', 'Authorization'],
+    
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: true, // Crucial si manejas cookies o tokens en cabeceras de autorización
-    optionsSuccessStatus: 204 // Para navegadores antiguos (preflight requests)
+    credentials: true, // Necesario para tokens de autenticación
+    optionsSuccessStatus: 204
 };
 
-// 2. Usar la configuración CORS específica
+// 2. Usar la configuración CORS
 app.use(cors(corsOptions));
 
-// ------------------------------------
+// ------------------------------------------------------------------------
 
 app.use(express.json());
 

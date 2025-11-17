@@ -7,23 +7,21 @@ import vacanteRoutes from "./routes/vacanteRoutes.js";
 import postulacionRoutes from "./routes/postulacionRoutes.js";
 import empresaRoutes from "./routes/empresaRoutes.js";
 import estudianteRoutes from "./routes/estudianteRoutes.js";
+import authRoutes from "./routes/authRoutes.js"; // ⬅️ IMPORTANTE
+
 import pool from "./database.js";
 
 const app = express();
 
-// 🧩 Middlewares
 app.use(cors());
 app.use(express.json());
 
-// 🟢 Servir archivos estáticos
 app.use("/uploads", express.static(path.join(path.resolve(), "src", "uploads")));
 
-// 🟣 Ruta raíz para evitar "Cannot GET /"
 app.get("/", (req, res) => {
   res.send("Backend UdeC API funcionando 🚀");
 });
 
-// 🔵 Ruta de prueba con base de datos
 app.get("/users", async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM users");
@@ -34,14 +32,15 @@ app.get("/users", async (req, res) => {
   }
 });
 
-// 📦 Rutas API
+// ⬅️ AÑADIR ESTA LÍNEA
+app.use("/api/auth", authRoutes);
+
 app.use("/api/vacantes", vacanteRoutes);
 app.use("/api/postulaciones", postulacionRoutes);
 app.use("/api/empresas", empresaRoutes);
 app.use("/api/estudiantes", estudianteRoutes);
 
-// 🚀 Iniciar servidor
-const PORT = process.env.PORT || 8080; // Railway usa PORT dinámico
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
 });

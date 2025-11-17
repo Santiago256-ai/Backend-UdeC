@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url       = env("DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
 
 model Usuario {
@@ -13,7 +13,13 @@ model Usuario {
   apellidos       String        // ⬅️ Almacena los apellidos
   usuario         String        @unique // ⬅️ El nombre de usuario único
   correo          String        @unique
-  password        String        // ⬅️ La contraseña debe ser obligatoria
+  
+  // 🚨 MODIFICACIÓN CLAVE 1: La contraseña es opcional para el login social
+  password        String?       // ⬅️ Ahora es opcional (String?)
+  
+  // 🚨 MODIFICACIÓN CLAVE 2: Campo para almacenar el UID de Firebase
+  firebaseUid     String?       @unique // ⬅️ Nuevo campo, único y opcional
+  
   rol             String        @default("estudiante") // ⬅️ Valor por defecto
   postulaciones   Postulacion[]
 }
@@ -61,29 +67,29 @@ model Vacante {
   titulo        String
   descripcion   String
   ubicacion     String
-  tipo          String         // Ej: "Tiempo completo", "Medio tiempo", "Práctica"
-  modalidad     String         // Ej: "Presencial", "Remoto", "Híbrido"
-  salario       String?        // Opcional
-  fechaCreacion DateTime       @default(now())
+  tipo          String        // Ej: "Tiempo completo", "Medio tiempo", "Práctica"
+  modalidad     String        // Ej: "Presencial", "Remoto", "Híbrido"
+  salario       String?       // Opcional
+  fechaCreacion DateTime      @default(now())
 
   empresaId     Int
-  empresa       Empresa        @relation(fields: [empresaId], references: [id])
+  empresa       Empresa       @relation(fields: [empresaId], references: [id])
 
   postulaciones Postulacion[]
 }
 
 model Postulacion {
-  id        Int      @id @default(autoincrement())
-  telefono  String?
-  cv_url    String?
+  id        Int      @id @default(autoincrement())
+  telefono  String?
+  cv_url    String?
   // ✅ CAMPO AGREGADO: Para registrar el estado de la postulación
-  estado    String   @default("PENDIENTE") // Usamos String con un valor por defecto
+  estado    String   @default("PENDIENTE") // Usamos String con un valor por defecto
 
-  fecha     DateTime @default(now())
+  fecha     DateTime @default(now())
 
-  vacanteId Int
-  usuarioId Int
+  vacanteId Int
+  usuarioId Int
 
-  vacante   Vacante @relation(fields: [vacanteId], references: [id])
-  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+  vacante   Vacante @relation(fields: [vacanteId], references: [id])
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
 }

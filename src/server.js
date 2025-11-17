@@ -1,3 +1,5 @@
+// backend/server.js
+
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
@@ -7,7 +9,7 @@ import vacanteRoutes from "./routes/vacanteRoutes.js";
 import postulacionRoutes from "./routes/postulacionRoutes.js";
 import empresaRoutes from "./routes/empresaRoutes.js";
 import estudianteRoutes from "./routes/estudianteRoutes.js";
-import authRoutes from "./routes/authRoutes.js"; // ⬅️ IMPORTANTE
+import authRoutes from "./routes/authRoutes.js"; // ⬅️ Correcto
 
 import pool from "./database.js";
 
@@ -32,8 +34,8 @@ app.get("/users", async (req, res) => {
   }
 });
 
-// ⬅️ AÑADIR ESTA LÍNEA
-app.use("/api/auth", authRoutes);
+// ⬅️ LA RUTA ESTÁ CORRECTAMENTE MONTADA
+app.use("/api/auth", authRoutes); 
 
 app.use("/api/vacantes", vacanteRoutes);
 app.use("/api/postulaciones", postulacionRoutes);

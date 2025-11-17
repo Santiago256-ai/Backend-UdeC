@@ -1,4 +1,4 @@
-// server.js modificado
+// server.js modificado (con diagnóstico mejorado)
 
 import "dotenv/config";
 import express from "express";
@@ -22,11 +22,20 @@ const app = express();
 // ----------------- CONFIGURACIÓN FIREBASE ADMIN -----------------
 
 try {
-    // Usar la variable de entorno Base64 para evitar el error de JSON
+    // === INICIO DE DIAGNÓSTICO ===
+    // ⚠️ Advertencia si la variable antigua todavía está presente
+    if (process.env.FIREBASE_ADMIN_CREDENTIALS) {
+        console.warn("⚠️ ADVERTENCIA: La variable FIREBASE_ADMIN_CREDENTIALS todavía existe y debe ser eliminada.");
+        // Opcionalmente, eliminarla en runtime para prevenir conflictos
+        // delete process.env.FIREBASE_ADMIN_CREDENTIALS; 
+    }
+    // === FIN DE DIAGNÓSTICO ===
+
     const base64Credentials = process.env.FIREBASE_ADMIN_CREDENTIALS_BASE64;
 
     if (!base64Credentials) {
-        throw new Error("La variable FIREBASE_ADMIN_CREDENTIALS_BASE64 no está configurada. Usando Base64.");
+        // ERROR CLARO: Si la variable Base64 no existe, lanzamos un error que no confunde.
+        throw new Error("ERROR CRÍTICO: La variable FIREBASE_ADMIN_CREDENTIALS_BASE64 no está configurada en el entorno.");
     }
 
     // 1. Decodificar la cadena Base64 a una cadena JSON (utf8)
@@ -41,8 +50,11 @@ try {
 
     console.log("✅ Firebase Admin inicializado correctamente");
 } catch (error) {
-    // Si falla la inicialización (por credenciales o por no existir la variable), se registra el error
-    console.error("❌ Error al inicializar Firebase Admin:", error.message);
+    // Si falla la inicialización, registramos el error CLARAMENTE
+    console.error("❌ ERROR FATAL DE INICIALIZACIÓN DE FIREBASE:", error.message);
+    
+    // Terminamos el proceso para que Railway registre el error y no siga reiniciando
+    process.exit(1); 
 }
 
 // ---------------------------------------------------------------

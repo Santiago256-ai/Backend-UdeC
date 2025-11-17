@@ -1,7 +1,13 @@
+// server.js modificado
+
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import path from "path";
+import admin from "firebase-admin";
+
+// Importamos Buffer para decodificar la cadena Base64, ya que es necesario en ESM
+import { Buffer } from 'buffer'; 
 
 import vacanteRoutes from "./routes/vacanteRoutes.js";
 import postulacionRoutes from "./routes/postulacionRoutes.js";
@@ -13,32 +19,56 @@ import pool from "./database.js";
 
 const app = express();
 
-// --- CONFIGURACIÓN CORS CORREGIDA (Abierto para el dominio de Vercel) ---
+// ----------------- CONFIGURACIÓN FIREBASE ADMIN -----------------
+
+try {
+    // Usar la variable de entorno Base64 para evitar el error de JSON
+    const base64Credentials = process.env.FIREBASE_ADMIN_CREDENTIALS_BASE64;
+
+    if (!base64Credentials) {
+        throw new Error("La variable FIREBASE_ADMIN_CREDENTIALS_BASE64 no está configurada. Usando Base64.");
+    }
+
+    // 1. Decodificar la cadena Base64 a una cadena JSON (utf8)
+    const decodedJson = Buffer.from(base64Credentials, 'base64').toString('utf8');
+    
+    // 2. Parsear la cadena JSON decodificada
+    const firebaseCredentials = JSON.parse(decodedJson); 
+
+    admin.initializeApp({
+        credential: admin.credential.cert(firebaseCredentials),
+    });
+
+    console.log("✅ Firebase Admin inicializado correctamente");
+} catch (error) {
+    // Si falla la inicialización (por credenciales o por no existir la variable), se registra el error
+    console.error("❌ Error al inicializar Firebase Admin:", error.message);
+}
+
+// ---------------------------------------------------------------
+// ----------------- CONFIGURACIÓN CORS -----------------
 
 const corsOptions = {
-    // Usar una función para manejar el origen y permitir múltiples dominios.
-    // **OPCIÓN MÁS SENCILLA Y FUNCIONAL EN PRODUCCIÓN:**
+    // Tu frontend de Vercel está correctamente incluido aquí
     origin: ['https://frontend-ude-c.vercel.app', 'http://localhost:3000', 'http://localhost:5173'],
-    
-    // Opcional: Si la opción de arriba no funciona, usa el comodín para todo:
-    // origin: '*', 
-    // Si usas '*', debes añadir la siguiente línea para que funcione con credenciales
-    // allowedHeaders: ['Content-Type', 'Authorization'],
-    
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: true, // Necesario para tokens de autenticación
+    credentials: true, // necesario si usas cookies o tokens
     optionsSuccessStatus: 204
 };
 
-// 2. Usar la configuración CORS
 app.use(cors(corsOptions));
 
-// ------------------------------------------------------------------------
+// ---------------------------------------------------------------
+// ----------------- MIDDLEWARES -----------------
 
 app.use(express.json());
 
-// Nota: Asegúrate de que path.resolve() apunta correctamente a la raíz del proyecto
+// Archivos estáticos (uploads)
+// path.resolve() funciona bien en entornos de despliegue como Railway
 app.use("/uploads", express.static(path.join(path.resolve(), "src", "uploads")));
+
+// ---------------------------------------------------------------
+// ----------------- RUTAS -----------------
 
 app.get("/", (req, res) => {
     res.send("Backend UdeC API funcionando 🚀");
@@ -54,12 +84,15 @@ app.get("/users", async (req, res) => {
     }
 });
 
-// Rutas API
+// API Routes
 app.use("/api/auth", authRoutes); 
 app.use("/api/vacantes", vacanteRoutes);
 app.use("/api/postulaciones", postulacionRoutes);
 app.use("/api/empresas", empresaRoutes);
 app.use("/api/estudiantes", estudianteRoutes);
+
+// ---------------------------------------------------------------
+// ----------------- INICIALIZAR SERVIDOR -----------------
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {

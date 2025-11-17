@@ -1,6 +1,6 @@
 {
   "name": "backend-portal-empleo",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Backend para portal de empleo universitario",
   "main": "src/server.js",
   "type": "module",

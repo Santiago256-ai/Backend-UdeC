@@ -1,4 +1,4 @@
-// server.js modificado (con diagnóstico mejorado)
+// server.js modificado (con diagnóstico de BBDD)
 
 import "dotenv/config";
 import express from "express";
@@ -15,7 +15,8 @@ import empresaRoutes from "./routes/empresaRoutes.js";
 import estudianteRoutes from "./routes/estudianteRoutes.js";
 import authRoutes from "./routes/authRoutes.js"; 
 
-import pool from "./database.js";
+// 🛑 DIAGNÓSTICO: COMENTAR para saltar la inicialización de la BBDD
+// import pool from "./database.js"; 
 
 const app = express();
 
@@ -83,17 +84,13 @@ app.use("/uploads", express.static(path.join(path.resolve(), "src", "uploads")))
 // ----------------- RUTAS -----------------
 
 app.get("/", (req, res) => {
-    res.send("Backend UdeC API funcionando 🚀");
+    res.send("Backend UdeC API funcionando 🚀 (BBDD deshabilitada para diagnóstico)");
 });
 
+// 🛑 DIAGNÓSTICO: Ruta /users modificada para no usar pool
 app.get("/users", async (req, res) => {
-    try {
-        const result = await pool.query("SELECT * FROM users");
-        res.json(result.rows);
-    } catch (err) {
-        console.error(err);
-        res.status(500).send("Error en el servidor");
-    }
+    // Nota: Si el backend arranca, esta ruta devolverá un 200 con un mensaje
+    res.status(200).json({ message: "Ruta de usuarios bypass, BBDD deshabilitada para diagnóstico" });
 });
 
 // API Routes

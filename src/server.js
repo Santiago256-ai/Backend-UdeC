@@ -1,4 +1,4 @@
-// server.js modificado (con diagnóstico de BBDD)
+// server.js modificado (con diagnóstico de BBDD y FIX de Firebase)
 
 import "dotenv/config";
 import express from "express";
@@ -15,7 +15,7 @@ import empresaRoutes from "./routes/empresaRoutes.js";
 import estudianteRoutes from "./routes/estudianteRoutes.js";
 import authRoutes from "./routes/authRoutes.js"; 
 
-// 🛑 DIAGNÓSTICO: COMENTAR para saltar la inicialización de la BBDD
+// 🛑 DIAGNÓSTICO: COMENTADO para saltar la inicialización de la BBDD
 // import pool from "./database.js"; 
 
 const app = express();
@@ -23,20 +23,19 @@ const app = express();
 // ----------------- CONFIGURACIÓN FIREBASE ADMIN -----------------
 
 try {
-    // === INICIO DE DIAGNÓSTICO ===
-    // ⚠️ Advertencia si la variable antigua todavía está presente
+    // === FIX CRÍTICO: Eliminar la variable de entorno por defecto que causa crash ===
+    // Esto previene que el SDK de Firebase (admin) la busque y lance un error
+    // ANTES de que podamos usar nuestra variable Base64, aunque ya la hayas eliminado de Railway.
     if (process.env.FIREBASE_ADMIN_CREDENTIALS) {
-        console.warn("⚠️ ADVERTENCIA: La variable FIREBASE_ADMIN_CREDENTIALS todavía existe y debe ser eliminada.");
-        // Opcionalmente, eliminarla en runtime para prevenir conflictos
-        // delete process.env.FIREBASE_ADMIN_CREDENTIALS; 
+        console.warn("⚠️ ADVERTENCIA: Eliminando la variable antigua FIREBASE_ADMIN_CREDENTIALS del runtime.");
+        delete process.env.FIREBASE_ADMIN_CREDENTIALS;
     }
-    // === FIN DE DIAGNÓSTICO ===
 
     const base64Credentials = process.env.FIREBASE_ADMIN_CREDENTIALS_BASE64;
 
     if (!base64Credentials) {
         // ERROR CLARO: Si la variable Base64 no existe, lanzamos un error que no confunde.
-        throw new Error("ERROR CRÍTICO: La variable FIREBASE_ADMIN_CREDENTIALS_BASE64 no está configurada en el entorno.");
+        throw new Error("ERROR CRÍTICO: La variable FIREBASE_ADMIN_CREDENTIALS_BASE64 NO ESTÁ CONFIGURADA.");
     }
 
     // 1. Decodificar la cadena Base64 a una cadena JSON (utf8)
@@ -51,7 +50,7 @@ try {
 
     console.log("✅ Firebase Admin inicializado correctamente");
 } catch (error) {
-    // Si falla la inicialización, registramos el error CLARAMENTE
+    // Si falla la inicialización, registramos el error CLARAMENTE y forzamos el fin
     console.error("❌ ERROR FATAL DE INICIALIZACIÓN DE FIREBASE:", error.message);
     
     // Terminamos el proceso para que Railway registre el error y no siga reiniciando

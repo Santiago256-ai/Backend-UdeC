@@ -1,30 +1,39 @@
-// backend/src/config/firebase-admin.js
-
 import admin from 'firebase-admin';
+import { Buffer } from 'buffer'; // Importamos Buffer para decodificar
 
-// 1. Obtener las credenciales desde la variable de entorno
-const serviceAccountKey = process.env.FIREBASE_ADMIN_CREDENTIALS;
+// La variable que sí funciona en Railway
+const base64Credentials = process.env.FIREBASE_ADMIN_CREDENTIALS_BASE64; 
 
 let credentials;
 
 try {
-    if (!serviceAccountKey) {
-        throw new Error("FIREBASE_ADMIN_CREDENTIALS environment variable is not set.");
+    // ⚠️ CRÍTICO: Asegurarse de que no esté leyendo la variable antigua por defecto
+    if (process.env.FIREBASE_ADMIN_CREDENTIALS) {
+        delete process.env.FIREBASE_ADMIN_CREDENTIALS;
     }
-    // 2. Parsear el string JSON a un objeto (esto es necesario en producción)
-    credentials = JSON.parse(serviceAccountKey); 
+
+    if (!base64Credentials) {
+        throw new Error("ERROR CRÍTICO: La variable FIREBASE_ADMIN_CREDENTIALS_BASE64 no está configurada.");
+    }
+
+    // 1. Decodificar la cadena Base64
+    const decodedJson = Buffer.from(base64Credentials, 'base64').toString('utf8');
+    
+    // 2. Parsear el string JSON
+    credentials = JSON.parse(decodedJson); 
 } catch (error) {
-    console.error("Error parsing Firebase credentials:", error.message);
-    // Si falla, el servicio no iniciará, lo cual es correcto por seguridad.
+    console.error("❌ Error al procesar credenciales Base64 de Firebase:", error.message);
+    // Forzar el cierre para que Railway registre el error.
     process.exit(1); 
 }
 
 // Inicializa Firebase Admin solo si no ha sido inicializado ya
 if (!admin.apps.length) {
     admin.initializeApp({
-        // Usar el objeto parseado para inicializar
         credential: admin.credential.cert(credentials) 
     });
 }
+
+console.log("✅ Firebase Admin SDK configurado (usando Base64)");
 
 export default admin;

@@ -1,4 +1,4 @@
-// server.js modificado (con diagnóstico de BBDD y FIX de Firebase)
+// server.js modificado (con Singleton Fix para Firebase)
 
 import "dotenv/config";
 import express from "express";
@@ -20,12 +20,11 @@ import authRoutes from "./routes/authRoutes.js";
 
 const app = express();
 
-// ----------------- CONFIGURACIÓN FIREBASE ADMIN -----------------
+// ----------------- CONFIGURACIÓN FIREBASE ADMIN (Aplicando Singleton Fix) -----------------
 
 try {
-    // === FIX CRÍTICO: Eliminar la variable de entorno por defecto que causa crash ===
-    // Esto previene que el SDK de Firebase (admin) la busque y lance un error
-    // ANTES de que podamos usar nuestra variable Base64, aunque ya la hayas eliminado de Railway.
+    // === FIX CRÍTICO 1: Eliminar la variable de entorno por defecto ===
+    // Previene que el SDK de Firebase la busque y lance el error antiguo.
     if (process.env.FIREBASE_ADMIN_CREDENTIALS) {
         console.warn("⚠️ ADVERTENCIA: Eliminando la variable antigua FIREBASE_ADMIN_CREDENTIALS del runtime.");
         delete process.env.FIREBASE_ADMIN_CREDENTIALS;
@@ -34,26 +33,28 @@ try {
     const base64Credentials = process.env.FIREBASE_ADMIN_CREDENTIALS_BASE64;
 
     if (!base64Credentials) {
-        // ERROR CLARO: Si la variable Base64 no existe, lanzamos un error que no confunde.
         throw new Error("ERROR CRÍTICO: La variable FIREBASE_ADMIN_CREDENTIALS_BASE64 NO ESTÁ CONFIGURADA.");
     }
 
-    // 1. Decodificar la cadena Base64 a una cadena JSON (utf8)
+    // 1. Decodificar y Parsear (Esto requiere que la Base64 sea la correcta)
     const decodedJson = Buffer.from(base64Credentials, 'base64').toString('utf8');
-    
-    // 2. Parsear la cadena JSON decodificada
     const firebaseCredentials = JSON.parse(decodedJson); 
 
-    admin.initializeApp({
-        credential: admin.credential.cert(firebaseCredentials),
-    });
+    // ✅ FIX CRÍTICO 2: Aplicar el Singleton Pattern para evitar el error "already exists"
+    if (!admin.apps.length) {
+        admin.initializeApp({
+            credential: admin.credential.cert(firebaseCredentials),
+        });
+        console.log("✅ Firebase Admin inicializado correctamente");
+    } else {
+         // Si ya está inicializada por otro archivo (como indican tus logs), la reutilizamos
+        admin.app(); 
+        console.log("✅ Firebase Admin ya estaba inicializado. Reutilizando la aplicación.");
+    }
 
-    console.log("✅ Firebase Admin inicializado correctamente");
 } catch (error) {
     // Si falla la inicialización, registramos el error CLARAMENTE y forzamos el fin
     console.error("❌ ERROR FATAL DE INICIALIZACIÓN DE FIREBASE:", error.message);
-    
-    // Terminamos el proceso para que Railway registre el error y no siga reiniciando
     process.exit(1); 
 }
 

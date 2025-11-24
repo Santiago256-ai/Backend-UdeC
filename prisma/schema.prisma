@@ -7,59 +7,71 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// =========================================================
+// MODELOS EXISTENTES
+// =========================================================
+
 model Usuario {
   id              Int           @id @default(autoincrement())
-  nombres         String        // ⬅️ Almacena los nombres
-  apellidos       String        // ⬅️ Almacena los apellidos
-  usuario         String        @unique // ⬅️ El nombre de usuario único
+  nombres         String
+  apellidos       String
+  usuario         String        @unique
   correo          String        @unique
   
-  // 🚨 MODIFICACIÓN CLAVE 1: La contraseña es opcional para el login social
-  password        String?       // ⬅️ Ahora es opcional (String?)
+  // Login Social
+  password        String?
+  firebaseUid     String?       @unique 
   
-  // 🚨 MODIFICACIÓN CLAVE 2: Campo para almacenar el UID de Firebase
-  firebaseUid     String?       @unique // ⬅️ Nuevo campo, único y opcional
-  
-  rol             String        @default("estudiante") // ⬅️ Valor por defecto
+  rol             String        @default("estudiante")
   postulaciones   Postulacion[]
+  
+  // ⚡ Relaciones de Mensajería
+  mensajesEnviados  Mensaje[]   @relation("SentMessages")
+  mensajesRecibidos Mensaje[]   @relation("ReceivedMessages")
+  
+  // ⚡ Relación con Notificaciones
+  notificaciones    Notificacion[]
 }
 
 model Empresa {
-  id Int @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  // Credenciales de acceso
-  email           String @unique
-  password        String
+  // Credenciales de acceso
+  email           String @unique
+  password        String
 
-  // Información Básica
-  nombre          String
-  phones          String
-  contactName     String
-  nit             String? @unique
+  // Información Básica
+  nombre          String
+  phones          String
+  contactName     String
+  nit             String? @unique
 
-  // Ubicación
-  address         String
-  city            String
-  department      String
+  // Ubicación
+  address         String
+  city            String
+  department      String
 
-  // Información Empresarial
-  companyType     String
-  economicSector  String[] // ⬅️ CAMBIO CLAVE 1: De String a String[]
-  foundationYear  Int
-  employees       String
+  // Información Empresarial
+  companyType     String
+  economicSector  String[] 
+  foundationYear  Int
+  employees       String
 
-  // Información Financiera y Comercial
-  annualRevenue        String
-  totalAssets          String?
-  equity               String?
-  distributionChannels String[] // ⬅️ CAMBIO CLAVE 2: De String a String[]
-  mainClients          String
-  emailAuthorization   Boolean @default(false)
+  // Información Financiera y Comercial
+  annualRevenue        String
+  totalAssets          String?
+  equity               String?
+  distributionChannels String[]
+  mainClients          String
+  emailAuthorization   Boolean @default(false)
 
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now())
 
-  // 🔹 Relación con Vacantes
-  vacantes Vacante[]
+  // 🔹 Relación con Vacantes
+  vacantes Vacante[]
+  
+  // ⚡ Relaciones de Mensajería
+  mensajesEnviados Mensaje[] @relation("EmpresaSentMessages")
 }
 
 model Vacante {
@@ -67,9 +79,9 @@ model Vacante {
   titulo        String
   descripcion   String
   ubicacion     String
-  tipo          String        // Ej: "Tiempo completo", "Medio tiempo", "Práctica"
-  modalidad     String        // Ej: "Presencial", "Remoto", "Híbrido"
-  salario       String?       // Opcional
+  tipo          String
+  modalidad     String
+  salario       String?
   fechaCreacion DateTime      @default(now())
 
   empresaId     Int
@@ -82,14 +94,61 @@ model Postulacion {
   id        Int      @id @default(autoincrement())
   telefono  String?
   cv_url    String?
-  // ✅ CAMPO AGREGADO: Para registrar el estado de la postulación
-  estado    String   @default("PENDIENTE") // Usamos String con un valor por defecto
+  estado    String   @default("PENDIENTE")
 
   fecha     DateTime @default(now())
 
   vacanteId Int
   usuarioId Int
 
-  vacante   Vacante @relation(fields: [vacanteId], references: [id])
-  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+  vacante   Vacante  @relation(fields: [vacanteId], references: [id])
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+}
+
+// =========================================================
+// ⚡ NUEVOS MODELOS PARA CHAT Y NOTIFICACIONES
+// =========================================================
+
+model Mensaje {
+  id            Int      @id @default(autoincrement())
+  contenido     String
+  fechaEnvio    DateTime @default(now())
+  read          Boolean  @default(false)
+
+  // 🔹 Quién envía (Sender): Puede ser Usuario o Empresa (polimorfismo simulado)
+  senderType    String   // 'USUARIO' o 'EMPRESA'
+
+  // Si envía la empresa, su ID va aquí
+  senderEmpresaId Int?
+  senderEmpresa   Empresa? @relation("EmpresaSentMessages", fields: [senderEmpresaId], references: [id])
+
+  // Si envía el usuario (egresado/estudiante), su ID va aquí
+  senderUsuarioId Int?
+  senderUsuario   Usuario? @relation("SentMessages", fields: [senderUsuarioId], references: [id])
+  
+  // 🔹 Quién recibe (Receiver): Siempre es un Usuario (Postulante)
+  receiverId    Int
+  receiver      Usuario  @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  
+  // 🔹 Relación con Notificación
+  notificacion  Notificacion?
+}
+
+model Notificacion {
+  id             Int      @id @default(autoincrement())
+  tipo           String   // Ej: 'MENSAJE_NUEVO', 'POSTULACION_ACEPTADA', 'NUEVA_VACANTE'
+  contenido      String
+  fecha          DateTime @default(now())
+  vista          Boolean  @default(false)
+  
+  // Relacionado con qué otro modelo (usado por el servicio para enlazar)
+  referenciaId   Int?     // ID de la Postulacion o Mensaje
+  
+  // 🔹 Relación con Mensaje
+  mensajeId      Int?     @unique // 1 a 1: Una notificación por mensaje
+  mensaje        Mensaje? @relation(fields: [mensajeId], references: [id])
+
+  // 🔹 Quién es notificado (siempre un Usuario)
+  usuarioId      Int
+  usuario        Usuario  @relation(fields: [usuarioId], references: [id])
 }

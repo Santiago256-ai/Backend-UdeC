@@ -1,47 +1,51 @@
-// backend/services/MensajeService.js
+// src/services/MensajeService.js
 
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+// Este servicio usa el pool de PostgreSQL y transacciones para garantizar atomicidad.
 
-async function enviarMensajeEmpresa(empresaId, postulanteId, contenido) {
-    // Usamos una transacción para garantizar que ambos registros (Mensaje y Notificación) 
-    // se creen o fallen juntos.
-    return prisma.$transaction(async (tx) => {
+async function enviarMensajeEmpresa(pool, empresaId, postulanteId, contenido) {
+    // Usamos una transacción para asegurar que el mensaje y la notificación se creen juntos
+    const client = await pool.connect();
+    
+    try {
+        await client.query('BEGIN'); // Iniciar la transacción
+
+        // 1. Guardar el mensaje en la tabla 'Mensaje'
+        // NOTA: Ajusta los nombres de las columnas (sender_empresa_id, receiver_id, contenido, sender_type, read) 
+        // para que coincidan con tu esquema PostgreSQL real.
+        const mensajeQuery = `
+            INSERT INTO Mensaje (sender_empresa_id, receiver_id, contenido, sender_type, read, fecha_envio)
+            VALUES ($1, $2, $3, 'EMPRESA', FALSE, NOW())
+            RETURNING *;
+        `;
+        const mensajeResult = await client.query(mensajeQuery, [empresaId, postulanteId, contenido]);
+        const nuevoMensaje = mensajeResult.rows[0];
         
-        // 1. Crear el registro del Mensaje
-        const nuevoMensaje = await tx.mensaje.create({
-            data: {
-                // Relación con el emisor (Empresa)
-                senderEmpresaId: empresaId,       
-                senderType: 'EMPRESA', // Tipo de emisor
-                
-                // Relación con el receptor (Postulante/Usuario)
-                receiverId: postulanteId,
-                
-                // Contenido
-                contenido: contenido,
-                read: false, 
-            }
-        });
-        
-        // 2. Crear una Notificación para el postulante
-        const nuevaNotificacion = await tx.notificacion.create({
-            data: {
-                usuarioId: postulanteId, // El ID del usuario que debe recibir la alerta
-                tipo: 'MENSAJE_NUEVO',
-                contenido: `Has recibido un nuevo mensaje de una empresa.`,
-                
-                // Enlaza la notificación al mensaje recién creado
-                mensajeId: nuevoMensaje.id, 
-                vista: false, 
-            }
-        });
+        // 2. Crear una notificación para el postulante
+        // NOTA: Ajusta los nombres de las columnas (usuario_id, tipo, contenido, mensaje_id, vista)
+        const notificacionQuery = `
+            INSERT INTO Notificacion (usuario_id, tipo, contenido, mensaje_id, vista, fecha)
+            VALUES ($1, 'MENSAJE_NUEVO', $2, $3, FALSE, NOW())
+            RETURNING *;
+        `;
+        const nuevaNotificacionResult = await client.query(notificacionQuery, [
+            postulanteId, 
+            `Tienes un nuevo mensaje de una empresa.`,
+            nuevoMensaje.id
+        ]);
+        const nuevaNotificacion = nuevaNotificacionResult.rows[0];
 
-        // Devuelve los registros creados
+        await client.query('COMMIT'); // Confirmar la transacción
+        
         return { mensaje: nuevoMensaje, notificacion: nuevaNotificacion };
-    });
+
+    } catch (error) {
+        await client.query('ROLLBACK'); // Revertir si hay un error
+        throw error;
+    } finally {
+        client.release();
+    }
 }
 
-module.exports = {
+export default {
     enviarMensajeEmpresa
 };

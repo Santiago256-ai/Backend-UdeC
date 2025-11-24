@@ -9,11 +9,11 @@ async function enviarMensajeEmpresa(pool, empresaId, postulanteId, contenido) {
     try {
         await client.query('BEGIN'); // Iniciar la transacción
 
-        // 1. Guardar el mensaje en la tabla 'Mensaje'
-        // NOTA: Ajusta los nombres de las columnas (sender_empresa_id, receiver_id, contenido, sender_type, read) 
-        // para que coincidan con tu esquema PostgreSQL real.
+        // 1. Guardar el mensaje en la tabla 'mensaje'
+        // IMPORTANTE: Se ha cambiado 'Mensaje' a 'mensaje' (minúsculas) para cumplir
+        // con la convención de PostgreSQL y evitar errores de sensibilidad a mayúsculas/minúsculas.
         const mensajeQuery = `
-            INSERT INTO Mensaje (sender_empresa_id, receiver_id, contenido, sender_type, read, fecha_envio)
+            INSERT INTO mensaje (sender_empresa_id, receiver_id, contenido, sender_type, read, fecha_envio)
             VALUES ($1, $2, $3, 'EMPRESA', FALSE, NOW())
             RETURNING *;
         `;
@@ -21,9 +21,9 @@ async function enviarMensajeEmpresa(pool, empresaId, postulanteId, contenido) {
         const nuevoMensaje = mensajeResult.rows[0];
         
         // 2. Crear una notificación para el postulante
-        // NOTA: Ajusta los nombres de las columnas (usuario_id, tipo, contenido, mensaje_id, vista)
+        // IMPORTANTE: También se ha cambiado 'Notificacion' a 'notificacion' por la misma razón.
         const notificacionQuery = `
-            INSERT INTO Notificacion (usuario_id, tipo, contenido, mensaje_id, vista, fecha)
+            INSERT INTO notificacion (usuario_id, tipo, contenido, mensaje_id, vista, fecha)
             VALUES ($1, 'MENSAJE_NUEVO', $2, $3, FALSE, NOW())
             RETURNING *;
         `;
@@ -39,6 +39,8 @@ async function enviarMensajeEmpresa(pool, empresaId, postulanteId, contenido) {
         return { mensaje: nuevoMensaje, notificacion: nuevaNotificacion };
 
     } catch (error) {
+        // La pila de llamadas indica que el error se capturó aquí y se propagó.
+        // El error específico era "relation "mensaje" does not exist".
         await client.query('ROLLBACK'); // Revertir si hay un error
         throw error;
     } finally {

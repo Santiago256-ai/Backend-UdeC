@@ -25,41 +25,41 @@ model Usuario {
 }
 
 model Empresa {
-  id Int @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  // Credenciales de acceso
-  email           String @unique // ⬅️ MODIFICADO: Debe ser único para el login
-  password        String // ⬅️ AGREGADO: Campo para almacenar el hash de la contraseña
+  // Credenciales de acceso
+  email           String @unique
+  password        String
 
-  // Información Básica
-  nombre          String
-  phones          String
-  contactName     String
-  nit             String? @unique // ⬅️ RECOMENDACIÓN: NIT único si aplica en tu país
+  // Información Básica
+  nombre          String
+  phones          String
+  contactName     String
+  nit             String? @unique
 
-  // Ubicación
-  address         String
-  city            String
-  department      String
+  // Ubicación
+  address         String
+  city            String
+  department      String
 
-  // Información Empresarial
-  companyType     String
-  economicSector  String
-  foundationYear  Int
-  employees       String
+  // Información Empresarial
+  companyType     String
+  economicSector  String[] // ⬅️ CAMBIO CLAVE 1: De String a String[]
+  foundationYear  Int
+  employees       String
 
-  // Información Financiera y Comercial
-  annualRevenue        String
-  totalAssets          String?
-  equity               String?
-  distributionChannels String
-  mainClients          String
-  emailAuthorization   Boolean @default(false)
+  // Información Financiera y Comercial
+  annualRevenue        String
+  totalAssets          String?
+  equity               String?
+  distributionChannels String[] // ⬅️ CAMBIO CLAVE 2: De String a String[]
+  mainClients          String
+  emailAuthorization   Boolean @default(false)
 
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now())
 
-  // 🔹 Relación con Vacantes
-  vacantes Vacante[]
+  // 🔹 Relación con Vacantes
+  vacantes Vacante[]
 }
 
 model Vacante {

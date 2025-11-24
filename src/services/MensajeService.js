@@ -6,25 +6,25 @@ async function enviarMensajeEmpresa(pool, empresaId, postulanteId, contenido) {
     try {
         await client.query('BEGIN');
 
-        // 1. Insertar mensaje (usamos el nombre REAL de la tabla: "Mensaje")
+        // 1. Insertar mensaje correctamente usando tabla y columnas reales de Prisma
         const mensajeQuery = `
-            INSERT INTO "Mensaje" 
+            INSERT INTO "Mensaje"
             (senderEmpresaId, receiverId, contenido, senderType, read, fechaEnvio)
             VALUES ($1, $2, $3, 'EMPRESA', FALSE, NOW())
             RETURNING *;
         `;
-
+        
         const mensajeResult = await client.query(mensajeQuery, [
             empresaId,
             postulanteId,
             contenido
         ]);
-
+        
         const nuevoMensaje = mensajeResult.rows[0];
 
-        // 2. Insertar notificación (la tabla real también usa mayúsculas: "Notificacion")
+        // 2. Crear notificación (tabla y columnas reales)
         const notificacionQuery = `
-            INSERT INTO "Notificacion" 
+            INSERT INTO "Notificacion"
             (usuarioId, tipo, contenido, mensajeId, vista, fecha)
             VALUES ($1, 'MENSAJE_NUEVO', $2, $3, FALSE, NOW())
             RETURNING *;
@@ -40,14 +40,12 @@ async function enviarMensajeEmpresa(pool, empresaId, postulanteId, contenido) {
 
         await client.query('COMMIT');
 
-        return {
-            mensaje: nuevoMensaje,
-            notificacion: nuevaNotificacion
-        };
+        return { mensaje: nuevoMensaje, notificacion: nuevaNotificacion };
 
     } catch (error) {
         await client.query('ROLLBACK');
         throw error;
+
     } finally {
         client.release();
     }

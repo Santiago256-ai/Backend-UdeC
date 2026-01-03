@@ -1,8 +1,12 @@
-import { PrismaClient } from '@prisma/client';
+// Cambia la importación para que apunte a la nueva carpeta generada
+import { PrismaClient } from './generated/client/index.js';
 
 const globalForPrisma = globalThis;
 
-const prisma = globalForPrisma.prisma || new PrismaClient();
+// Mantenemos la lógica del Singleton para evitar demasiadas conexiones
+const prisma = globalForPrisma.prisma || new PrismaClient({
+  log: ['error', 'warn'],
+});
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 

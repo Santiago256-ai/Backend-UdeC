@@ -4,17 +4,18 @@
   "description": "Backend para portal de empleo universitario",
   "main": "src/server.js",
   "type": "module",
- "scripts": {
-  "postinstall": "prisma generate",
-  "build": "prisma generate", 
-  "dev": "nodemon src/server.js",
-  "start": "node src/server.js"
-},
+  "scripts": {
+    "postinstall": "prisma generate",
+    "build": "prisma generate",
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js"
+  },
   "dependencies": {
     "@azure/msal-browser": "^4.24.1",
     "@azure/msal-react": "^3.0.20",
     "@prisma/client": "^6.17.0",
     "@react-oauth/google": "^0.12.2",
+    "@supabase/supabase-js": "^2.89.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",

@@ -5,9 +5,10 @@
   "main": "src/server.js",
   "type": "module",
   "scripts": {
-    "dev": "nodemon src/server.js",
-    "start": "node src/server.js"
-  },
+  "build": "prisma generate",
+  "dev": "nodemon src/server.js",
+  "start": "node src/server.js"
+},
   "dependencies": {
     "@azure/msal-browser": "^4.24.1",
     "@azure/msal-react": "^3.0.20",

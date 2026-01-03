@@ -1,6 +1,5 @@
 import express from "express";
 import multer from "multer";
-import path from "path"; // 🚨 Agregamos path
 import { 
     crearPostulacion, 
     obtenerPostulacionesPorVacante,
@@ -9,21 +8,21 @@ import {
 
 const router = express.Router();
 
-// 📂 Configuración de almacenamiento con multer (CORREGIDO el destino)
-const storage = multer.diskStorage({
-  // Usamos path.join para apuntar correctamente a src/uploads desde la raíz
-  destination: (req, file, cb) => cb(null, path.join(path.resolve(), 'src', 'uploads')),
-  filename: (req, file, cb) => cb(null, Date.now() + "_" + file.originalname),
-});
+// ✅ CORRECCIÓN PARA VERCEL: Usar memoria en lugar de disco
+// Esto evita intentar escribir en '/var/task/src/uploads/', que está bloqueado
+const storage = multer.memoryStorage();
 
 const upload = multer({
-  storage,
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype !== "application/pdf") {
-      return cb(new Error("Solo se permiten archivos PDF"));
-    }
-    cb(null, true);
-  },
+  storage,
+  limits: { 
+    fileSize: 5 * 1024 * 1024 // Límite de 5MB para evitar sobrecargar la memoria
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype !== "application/pdf") {
+      return cb(new Error("Solo se permiten archivos PDF"), false);
+    }
+    cb(null, true);
+  },
 });
 
 // --- RUTAS DE POSTULACIÓN ---
@@ -32,10 +31,11 @@ const upload = multer({
 router.get("/vacante/:vacanteId", obtenerPostulacionesPorVacante);
 
 // 2. POST: Subir CV y crear postulación
+// Ahora el archivo PDF estará disponible en 'req.file.buffer' dentro del controlador
 router.post(
-  "/upload",
-  upload.single("cv"), 
-  crearPostulacion 
+  "/upload",
+  upload.single("cv"), 
+  crearPostulacion 
 );
 
 // 3. PATCH: Actualizar el estado de una postulación

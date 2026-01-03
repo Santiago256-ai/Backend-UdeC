@@ -1,38 +1,38 @@
 import { Router } from "express";
 import multer from "multer";
-import { createClient } from '@supabase/supabase-js'; // Importamos el cliente de Supabase
+import { createClient } from '@supabase/supabase-js'; 
 import prisma from "../prismaClient.js"; 
 import { crearEstudiante, loginEstudiante } from "../controllers/estudianteController.js"; 
 
 const router = Router();
 
-// 1. Configuración de Supabase
-// Estas variables ya deben estar configuradas en tu panel de Vercel
+// 1. Inicialización de Supabase con variables de entorno de Vercel
 const supabase = createClient(
     process.env.SUPABASE_URL, 
     process.env.SUPABASE_ANON_KEY
 );
 
-// 2. Configuración de multer en MEMORIA
-// Esto evita intentar escribir en el disco duro bloqueado de Vercel
+// 2. Configuración de Multer: USAR MEMORIA (Crucial para Vercel)
+// Esto evita el error EROFS al no intentar escribir en el disco del servidor
 const storage = multer.memoryStorage(); 
 
 const upload = multer({ 
     storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // Máximo 5MB
     fileFilter: (req, file, cb) => {
-        if (file.mimetype !== "application/pdf") {
-            return cb(new Error("Solo se permiten archivos PDF"));
+        if (file.mimetype === "application/pdf") {
+            cb(null, true);
+        } else {
+            cb(new Error("Solo se permiten archivos PDF"), false);
         }
-        cb(null, true);
-    },
-    limits: { fileSize: 5 * 1024 * 1024 } // Límite de 5MB por archivo
+    }
 });
 
-// 🛣️ RUTAS DE AUTENTICACIÓN
+// RUTAS EXISTENTES
 router.post("/registro", crearEstudiante);
 router.post("/login", loginEstudiante); 
 
-// GET: Obtener postulaciones de un usuario
+// Obtener postulaciones por usuario
 router.get("/usuario/:usuarioId", async (req, res) => {
     try {
         const usuarioId = parseInt(req.params.usuarioId);
@@ -42,61 +42,64 @@ router.get("/usuario/:usuarioId", async (req, res) => {
         });
         res.json(postulaciones);
     } catch (error) {
-        console.error("Error al obtener postulaciones:", error);
-        res.status(500).json({ error: "Error interno al obtener postulaciones" });
+        console.error("Error en GET postulaciones:", error);
+        res.status(500).json({ error: "Error al obtener postulaciones" });
     }
 });
 
-// POST: Subir CV a Supabase y registrar en Base de Datos
+// 3. RUTA DE CARGA DE CV (CORREGIDA PARA LA NUBE)
 router.post("/:vacanteId/upload", upload.single("cv"), async (req, res) => {
     try {
-        const vacanteId = parseInt(req.params.vacanteId);
         const { usuarioId, telefono } = req.body;
+        const vacanteId = parseInt(req.params.vacanteId);
 
         if (!req.file) {
-            return res.status(400).json({ error: "No se seleccionó ningún archivo PDF" });
+            return res.status(400).json({ error: "Debe subir un archivo PDF" });
         }
 
-        // Generamos un nombre único para evitar que archivos se sobrescriban
+        // Crear un nombre único para el archivo en la nube
         const fileName = `${Date.now()}_${req.file.originalname.replace(/\s+/g, '_')}`;
 
-        // A. Subimos el archivo directamente a Supabase Storage
+        // SUBIDA A SUPABASE STORAGE
         const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('hojas_de_vida') // Asegúrate de que este nombre coincida con tu bucket
+            .from('hojas_de_vida') // Nombre del bucket que creaste
             .upload(fileName, req.file.buffer, {
                 contentType: 'application/pdf',
                 upsert: false
             });
 
         if (uploadError) {
-            console.error("Error al subir a Supabase:", uploadError);
-            return res.status(500).json({ error: "Error al subir archivo a la nube" });
+            console.error("Error subiendo a Supabase:", uploadError);
+            throw uploadError;
         }
 
-        // B. Obtenemos la URL pública del archivo (Gracias a tus políticas SELECT)
+        // OBTENER LA URL PÚBLICA (Gracias a tu política SELECT)
         const { data: { publicUrl } } = supabase.storage
             .from('hojas_de_vida')
             .getPublicUrl(fileName);
 
-        // C. Guardamos la postulación en Prisma usando la URL pública
+        // GUARDAR EN POSTGRESQL (A través de Prisma)
         const postulacion = await prisma.postulacion.create({
             data: {
                 vacanteId,
                 usuarioId: parseInt(usuarioId),
                 telefono,
-                cv_url: publicUrl, // Aquí guardamos el link directo, no el nombre del archivo
+                cv_url: publicUrl, // Guardamos el link de la nube, no una ruta local
             },
         });
 
         res.json({ 
-            message: "CV subido y postulación registrada exitosamente", 
+            message: "¡Postulación exitosa!", 
             postulacion,
-            url: publicUrl 
+            fileUrl: publicUrl 
         });
 
     } catch (error) {
-        console.error("Error completo en la postulación:", error);
-        res.status(500).json({ error: "Error interno al procesar la subida del CV" });
+        console.error("Error detallado en la carga:", error);
+        res.status(500).json({ 
+            error: "Error interno al procesar el CV",
+            details: error.message 
+        });
     }
 });
 

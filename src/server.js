@@ -132,3 +132,6 @@ checkDatabaseConnection().then(() => {
         console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
     });
 });
+
+// ✅ OBLIGATORIO PARA VERCEL:
+export default app;

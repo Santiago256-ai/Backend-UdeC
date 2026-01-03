@@ -4,10 +4,11 @@
   "description": "Backend para portal de empleo universitario",
   "main": "src/server.js",
   "type": "module",
-  "scripts": {
-  "build": "prisma generate",
+ "scripts": {
+  "postinstall": "prisma generate",
+  "build": "prisma generate", 
   "dev": "nodemon src/server.js",
-  "start": "prisma generate && node src/server.js"
+  "start": "node src/server.js"
 },
   "dependencies": {
     "@azure/msal-browser": "^4.24.1",

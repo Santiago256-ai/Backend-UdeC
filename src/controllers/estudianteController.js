@@ -1,21 +1,31 @@
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs'; // ⬅️ CAMBIADO: Usar bcryptjs si usaste 'bcrypt' sin el módulo. Mejor usar 'bcryptjs' que es más común en Node.js.
-import jwt from 'jsonwebtoken'; // ⬅️ AGREGADO: Importar JWT
+import prisma from '../prismaClient.js'; // ⬅️ IMPORTANTE: Usa el cliente singleton para evitar errores en Vercel
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
-const prisma = new PrismaClient();
-// ⚠️ CLAVE SECRETA: Es crucial usar la misma clave secreta de tu empresaController.js
-const JWT_SECRET = process.env.JWT_SECRET || 'mi_clave_secreta_debes_cambiarla'; 
+const JWT_SECRET = process.env.JWT_SECRET || 'mi_clave_secreta_debes_cambiarla';
 
-
-// Función de Registro de Estudiante (Se mantiene igual, solo se actualiza la importación de bcrypt)
+// ==========================================
+// Función de Registro de Estudiante
+// ==========================================
 export const crearEstudiante = async (req, res) => {
-    const { nombres, apellidos, correo, usuario, contraseña, rol } = req.body; 
+    // Extraemos 'password' también por si el frontend lo envía con ese nombre
+    const { nombres, apellidos, correo, usuario, contraseña, password, rol } = req.body; 
+    
+    // Normalizamos la contraseña para aceptar cualquiera de los dos nombres de campo
+    const passwordFinal = contraseña || password;
+
+    // Validación básica antes de intentar crear en la DB
+    if (!nombres || !apellidos || !correo || !usuario || !passwordFinal) {
+        return res.status(400).json({ 
+            error: 'Faltan campos obligatorios: nombres, apellidos, correo, usuario y contraseña.' 
+        });
+    }
 
     try {
         // 1. Cifrar la contraseña
-        const hashedPassword = await bcrypt.hash(contraseña, 10); 
+        const hashedPassword = await bcrypt.hash(passwordFinal, 10); 
 
-        // 2. Crear el registro en Prisma con los campos separados
+        // 2. Crear el registro en Prisma
         const nuevoEstudiante = await prisma.usuario.create({
             data: { 
                 nombres, 
@@ -23,7 +33,7 @@ export const crearEstudiante = async (req, res) => {
                 usuario, 
                 correo, 
                 password: hashedPassword,
-                rol, 
+                rol: rol || 'estudiante', // Valor por defecto si no viene en el body
             },
         });
 
@@ -32,22 +42,34 @@ export const crearEstudiante = async (req, res) => {
         res.status(201).json(estudianteSinPassword); 
         
     } catch (error) {
-        console.error("Error de Prisma:", error);
+        console.error("Error detallado de Prisma:", error);
+
+        // Error de unicidad (P2002): El correo o usuario ya existe
         if (error.code === 'P2002') {
-            const target = error.meta.target.includes('correo') ? 'correo' : 'nombre de usuario';
-            return res.status(409).json({ error: `El ${target} ya está registrado.` });
+            const campoDuplicado = error.meta?.target?.includes('correo') ? 'correo' : 'nombre de usuario';
+            return res.status(409).json({ error: `El ${campoDuplicado} ya está registrado.` });
         }
+
+        // Error de validación de Prisma (El error que veías en los logs)
+        if (error.name === 'PrismaClientValidationError') {
+            return res.status(400).json({ 
+                error: 'Error de validación: Asegúrate de que todos los campos cumplen el formato correcto.' 
+            });
+        }
+
         res.status(500).json({ error: 'Error interno del servidor al crear estudiante.' });
     }
 };
 
-// 🔐 FUNCIÓN CORREGIDA: Inicio de Sesión (loginUsuario)
-export const loginEstudiante = async (req, res) => { // ⬅️ Exportamos como loginEstudiante para seguir la convención del frontend
-    // El frontend envía 'identificador' y 'contraseña'
-    const { identificador, contraseña: password } = req.body; 
+// ==========================================
+// Función de Inicio de Sesión
+// ==========================================
+export const loginEstudiante = async (req, res) => {
+    const { identificador, contraseña, password } = req.body; 
+    const passwordIngresado = contraseña || password;
 
-    if (!identificador || !password) {
-        return res.status(400).json({ error: 'Identificador y contraseña son requeridos.' });
+    if (!identificador || !passwordIngresado) {
+        return res.status(400).json({ error: 'Identificador (correo/usuario) y contraseña son requeridos.' });
     }
 
     try {
@@ -63,12 +85,16 @@ export const loginEstudiante = async (req, res) => { // ⬅️ Exportamos como l
 
         // 2. Verificar si el usuario existe
         if (!usuarioEncontrado) {
-            // Devolver 404 o 401. El frontend lo interpretará como un error y pasará a intentar con el login de empresa.
             return res.status(401).json({ error: 'Credenciales inválidas.' });
         }
 
         // 3. Comparar la contraseña hasheada
-        const isMatch = await bcrypt.compare(password, usuarioEncontrado.password);
+        // Validamos que exista una contraseña en la DB (por si usó login social antes)
+        if (!usuarioEncontrado.password) {
+            return res.status(401).json({ error: 'Este usuario no tiene contraseña establecida. Intenta con Login Social.' });
+        }
+
+        const isMatch = await bcrypt.compare(passwordIngresado, usuarioEncontrado.password);
 
         if (!isMatch) {
             return res.status(401).json({ error: 'Credenciales inválidas.' });
@@ -81,7 +107,7 @@ export const loginEstudiante = async (req, res) => { // ⬅️ Exportamos como l
             { expiresIn: '1d' }
         );
 
-        // 5. Devolver la respuesta (excluyendo la contraseña y añadiendo el token/rol)
+        // 5. Devolver la respuesta
         const { password: _, ...usuarioLogueado } = usuarioEncontrado;
 
         res.status(200).json({ 
@@ -89,7 +115,7 @@ export const loginEstudiante = async (req, res) => { // ⬅️ Exportamos como l
             token,
             usuario: {
                 ...usuarioLogueado,
-                rol: usuarioLogueado.rol || 'estudiante' // ⬅️ CLAVE: Devolver el rol para la redirección
+                rol: usuarioLogueado.rol || 'estudiante'
             }
         });
 
@@ -98,5 +124,3 @@ export const loginEstudiante = async (req, res) => { // ⬅️ Exportamos como l
         res.status(500).json({ error: 'Error interno del servidor durante el inicio de sesión.' });
     }
 };
-// ⚠️ Nota: Si tu frontend llama a esta función como loginUsuario en lugar de loginEstudiante,
-// asegúrate de cambiar el nombre de la exportación a 'loginUsuario' y la importación en las rutas.

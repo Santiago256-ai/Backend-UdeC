@@ -42,4 +42,20 @@ router.post('/enviar', async (req, res) => {
     }
 });
 
+// Obtener conteo de mensajes no leídos para la empresa
+router.get('/contadores-empresa/:empresaId', async (req, res) => {
+    const { empresaId } = req.params;
+    try {
+        const query = `
+            SELECT COUNT(*)::int as "unreadCount" 
+            FROM "Mensaje" 
+            WHERE "senderEmpresaId" = $1 AND "read" = FALSE AND "senderType" = 'USUARIO';
+        `;
+        const result = await pool.query(query, [empresaId]);
+        res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error al obtener contadores' });
+    }
+});
+
 export default router;

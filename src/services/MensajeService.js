@@ -1,41 +1,29 @@
-// src/services/MensajeService.js
-
-async function enviarMensajeEmpresa(pool, empresaId, postulanteId, contenido) {
+async function enviarMensaje(pool, { senderId, receiverId, contenido, senderType }) {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
 
+        // Determinamos quién es el remitente real para la DB
+        const senderEmpresaId = senderType === 'EMPRESA' ? parseInt(senderId) : null;
+        const senderUsuarioId = senderType === 'USUARIO' ? parseInt(senderId) : null;
+
         const mensajeQuery = `
             INSERT INTO "Mensaje" 
-            ("senderEmpresaId", "receiverId", "contenido", "senderType", "read", "fechaEnvio")
-            VALUES ($1, $2, $3, 'EMPRESA', FALSE, NOW())
+            ("senderEmpresaId", "senderUsuarioId", "receiverId", "contenido", "senderType", "read", "fechaEnvio")
+            VALUES ($1, $2, $3, $4, $5, FALSE, NOW())
             RETURNING *;
         `;
 
         const mensajeResult = await client.query(mensajeQuery, [
-            empresaId,
-            postulanteId,
-            contenido
-        ]);
-
-        const nuevoMensaje = mensajeResult.rows[0];
-
-        const notificacionQuery = `
-            INSERT INTO "Notificacion" 
-            ("usuarioId", "tipo", "contenido", "mensajeId", "vista", "fecha")
-            VALUES ($1, 'MENSAJE_NUEVO', $2, $3, FALSE, NOW())
-            RETURNING *;
-        `;
-
-        const notifResult = await client.query(notificacionQuery, [
-            postulanteId,
-            `Tienes un nuevo mensaje de una empresa.`,
-            nuevoMensaje.id
+            senderEmpresaId,
+            senderUsuarioId,
+            parseInt(receiverId),
+            contenido,
+            senderType
         ]);
 
         await client.query('COMMIT');
-        return { mensaje: nuevoMensaje, notificacion: notifResult.rows[0] };
-
+        return mensajeResult.rows[0];
     } catch (error) {
         await client.query('ROLLBACK');
         throw error;

@@ -5,7 +5,6 @@ async function enviarMensajeEmpresa(pool, empresaId, postulanteId, contenido) {
     try {
         await client.query('BEGIN');
 
-        // Guardar mensaje en tabla "Mensaje"
         const mensajeQuery = `
             INSERT INTO "Mensaje" 
             ("senderEmpresaId", "receiverId", "contenido", "senderType", "read", "fechaEnvio")
@@ -21,7 +20,6 @@ async function enviarMensajeEmpresa(pool, empresaId, postulanteId, contenido) {
 
         const nuevoMensaje = mensajeResult.rows[0];
 
-        // Crear notificación en tabla "Notificacion"
         const notificacionQuery = `
             INSERT INTO "Notificacion" 
             ("usuarioId", "tipo", "contenido", "mensajeId", "vista", "fecha")
@@ -36,7 +34,6 @@ async function enviarMensajeEmpresa(pool, empresaId, postulanteId, contenido) {
         ]);
 
         await client.query('COMMIT');
-
         return { mensaje: nuevoMensaje, notificacion: notifResult.rows[0] };
 
     } catch (error) {
@@ -47,4 +44,16 @@ async function enviarMensajeEmpresa(pool, empresaId, postulanteId, contenido) {
     }
 }
 
-export default { enviarMensajeEmpresa };
+// ⚡ NUEVA FUNCIÓN: Para que el historial cargue en el frontend
+async function obtenerHistorial(pool, usuarioId, empresaId) {
+    const query = `
+        SELECT * FROM "Mensaje"
+        WHERE ("senderEmpresaId" = $2 AND "receiverId" = $1)
+           OR ("senderUsuarioId" = $1 AND "senderType" = 'USUARIO')
+        ORDER BY "fechaEnvio" ASC;
+    `;
+    const result = await pool.query(query, [usuarioId, empresaId]);
+    return result.rows;
+}
+
+export default { enviarMensajeEmpresa, obtenerHistorial };

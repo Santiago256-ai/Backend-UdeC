@@ -1,31 +1,44 @@
 import express from 'express';
-import pool from '../database.js'; // Asegúrate de que esta ruta a tu pool es correcta
-import MensajeService from '../services/MensajeService.js'; // Importa el nuevo servicio
+import pool from '../database.js';
+import MensajeService from '../services/MensajeService.js';
 
 const router = express.Router();
 
-// Ruta: POST /api/mensajes/empresa
-// Objetivo: Enviar un mensaje de la Empresa a un Postulante
-router.post('/empresa', async (req, res) => {
-    // Los datos esperados son: { senderId (empresaId), receiverId (postulanteId), content }
-    const { senderId, receiverId, content } = req.body;
+// 1. OBTENER HISTORIAL: GET /api/mensajeria/historial/:usuarioId/:empresaId
+router.get('/historial/:usuarioId/:empresaId', async (req, res) => {
+    const { usuarioId, empresaId } = req.params;
 
-    if (!senderId || !receiverId || !content) {
-        return res.status(400).json({ error: 'Faltan datos requeridos (senderId, receiverId, content).' });
+    try {
+        const mensajes = await MensajeService.obtenerHistorial(pool, usuarioId, empresaId);
+        res.json(mensajes);
+    } catch (error) {
+        console.error('Error al obtener historial:', error);
+        res.status(500).json({ error: 'Error al cargar el historial de mensajes.' });
+    }
+});
+
+// 2. ENVIAR MENSAJE: POST /api/mensajeria/enviar
+router.post('/enviar', async (req, res) => {
+    // El frontend envía: { senderId, senderType, receiverId, contenido }
+    const { senderId, receiverId, contenido } = req.body;
+
+    if (!senderId || !receiverId || !contenido) {
+        return res.status(400).json({ error: 'Faltan datos requeridos.' });
     }
 
     try {
-        // Llama al servicio que maneja la lógica de DB (transacción de pool)
-        const resultado = await MensajeService.enviarMensajeEmpresa(pool, senderId, receiverId, content);
+        const resultado = await MensajeService.enviarMensajeEmpresa(
+            pool, 
+            senderId, 
+            receiverId, 
+            contenido
+        );
 
-        res.status(201).json({ 
-            message: 'Mensaje enviado y notificación creada.', 
-            data: resultado 
-        });
-
+        // Devolvemos solo el mensaje para que el frontend lo agregue a la lista
+        res.status(201).json(resultado.mensaje);
     } catch (error) {
-        console.error('Error al enviar mensaje desde la empresa:', error);
-        res.status(500).json({ error: 'Fallo interno del servidor al procesar el mensaje.', detalle: error.message });
+        console.error('Error al enviar mensaje:', error);
+        res.status(500).json({ error: 'No se pudo enviar el mensaje.' });
     }
 });
 

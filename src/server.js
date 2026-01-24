@@ -103,7 +103,7 @@ app.use("/api/postulaciones", postulacionRoutes);
 app.use("/api/empresas", empresaRoutes);
 app.use("/api/estudiantes", estudianteRoutes);
 // ⚡ CONEXIÓN DE LA NUEVA RUTA DE MENSAJES ⚡
-app.use("/api/mensajes", mensajesRoutes); 
+app.use("/api/mensajeria", mensajesRoutes); 
 
 // ---------------------------------------------------------------
 // ----------------- TEST DE BASE DE DATOS E INICIALIZAR SERVIDOR -----------------

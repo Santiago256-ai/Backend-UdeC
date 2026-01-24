@@ -4,7 +4,7 @@ import MensajeService from '../services/MensajeService.js';
 
 const router = express.Router();
 
-// 1. OBTENER HISTORIAL
+// 1. OBTENER HISTORIAL (Sin cambios)
 router.get('/historial/:usuarioId/:empresaId', async (req, res) => {
     const { usuarioId, empresaId } = req.params;
     try {
@@ -33,17 +33,33 @@ router.post('/enviar', async (req, res) => {
     }
 });
 
-// 3. RESUMEN PARA EL DROPDOWN (CORREGIDO SEGÚN TU PRISMA)
+// 3. CONTADORES (Soluciona el Error 404 de VacantesDashboard.jsx)
+// Tu frontend está buscando "/api/mensajeria/contadores/2", añadimos esta ruta
+router.get('/contadores/:usuarioId', async (req, res) => {
+    const { usuarioId } = req.params;
+    try {
+        const query = 'SELECT COUNT(*)::int as "unreadMessages" FROM "Mensaje" WHERE "receiverId" = $1 AND "read" = FALSE';
+        const result = await pool.query(query, [usuarioId]);
+        res.json({ 
+            unreadMessages: result.rows[0].unreadMessages || 0,
+            unreadNotifications: 0 
+        });
+    } catch (error) {
+        console.error('Error en contadores:', error);
+        res.status(500).json({ error: 'Error al obtener contadores' });
+    }
+});
+
+// 4. RESUMEN (Soluciona el Error 500 de NotificationBadge.jsx)
 router.get('/resumen/:usuarioId', async (req, res) => {
     const { usuarioId } = req.params;
     try {
-        // Contamos mensajes donde el usuario es el RECEPTOR y no han sido leídos
         const countRes = await pool.query(
             'SELECT COUNT(*)::int FROM "Mensaje" WHERE "receiverId" = $1 AND "read" = FALSE',
             [usuarioId]
         );
 
-        // Obtenemos los mensajes. Nota: Buscamos el nombre de la EMPRESA que envió el mensaje
+        // JOIN corregido: Buscamos en "Empresa" porque el usuario recibe mensajes de empresas
         const msgQuery = `
             SELECT m.id, m.contenido, m."senderEmpresaId" as "senderId", e.nombre as "senderNombre" 
             FROM "Mensaje" m 
@@ -63,11 +79,10 @@ router.get('/resumen/:usuarioId', async (req, res) => {
     }
 });
 
-// 4. MARCAR COMO LEÍDOS (CORREGIDO)
+// 5. MARCAR COMO LEÍDOS (Soluciona el Error 500 de Mensajeria.jsx)
 router.put('/leer/:usuarioId/:empresaId', async (req, res) => {
     const { usuarioId, empresaId } = req.params;
     try {
-        // Marcamos como leídos los mensajes que envió esa empresa específica a este usuario
         await pool.query(
             'UPDATE "Mensaje" SET "read" = TRUE WHERE "receiverId" = $1 AND "senderEmpresaId" = $2 AND "read" = FALSE',
             [usuarioId, empresaId]

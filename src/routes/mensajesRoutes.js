@@ -12,18 +12,13 @@ router.get('/historial/:usuarioId/:empresaId', async (req, res) => {
         res.json(mensajes);
     } catch (error) {
         console.error('Error al obtener historial:', error);
-        res.status(500).json({ error: 'Error al cargar el historial de mensajes.' });
+        res.status(500).json({ error: 'Error al cargar el historial.' });
     }
 });
 
 // 2. ENVIAR MENSAJE
 router.post('/enviar', async (req, res) => {
     const { senderId, receiverId, contenido, senderType } = req.body;
-
-    if (!senderId || !receiverId || !contenido) {
-        return res.status(400).json({ error: 'Faltan datos requeridos.' });
-    }
-
     try {
         const mensaje = await MensajeService.enviarMensajeEmpresa(pool, { 
             senderId, 
@@ -33,45 +28,26 @@ router.post('/enviar', async (req, res) => {
         });
         res.status(201).json(mensaje);
     } catch (error) {
-        console.error('Error al enviar mensaje:', error);
+        console.error('Error al enviar:', error);
         res.status(500).json({ error: 'No se pudo enviar el mensaje.' });
     }
 });
 
-// 3. CONTADORES (Solo el número)
-router.get('/contadores/:usuarioId', async (req, res) => {
-    const { usuarioId } = req.params;
-    try {
-        const query = `
-            SELECT COUNT(*)::int as "unreadMessages" 
-            FROM "Mensaje" 
-            WHERE "receiverId" = $1 AND "read" = FALSE;
-        `;
-        const result = await pool.query(query, [usuarioId]);
-        res.json({ 
-            unreadMessages: result.rows[0].unreadMessages || 0,
-            unreadNotifications: 0 
-        });
-    } catch (error) {
-        console.error('Error en contadores:', error);
-        res.status(500).json({ error: 'Error al obtener contadores' });
-    }
-});
-
-// ⚡ 4. RESUMEN PARA EL DROPDOWN (NUEVO)
-// Este es el que usa el NotificationBadge para mostrar la lista tipo Facebook
+// 3. RESUMEN PARA EL DROPDOWN (CORREGIDO SEGÚN TU PRISMA)
 router.get('/resumen/:usuarioId', async (req, res) => {
     const { usuarioId } = req.params;
     try {
-        // Obtenemos el conteo
-        const countQuery = 'SELECT COUNT(*)::int FROM "Mensaje" WHERE "receiverId" = $1 AND "read" = FALSE';
-        const countRes = await pool.query(countQuery, [usuarioId]);
+        // Contamos mensajes donde el usuario es el RECEPTOR y no han sido leídos
+        const countRes = await pool.query(
+            'SELECT COUNT(*)::int FROM "Mensaje" WHERE "receiverId" = $1 AND "read" = FALSE',
+            [usuarioId]
+        );
 
-        // Obtenemos los últimos 5 mensajes no leídos con el nombre de quien envía
+        // Obtenemos los mensajes. Nota: Buscamos el nombre de la EMPRESA que envió el mensaje
         const msgQuery = `
-            SELECT m.id, m.contenido, m."senderId", u.nombre as "senderNombre" 
+            SELECT m.id, m.contenido, m."senderEmpresaId" as "senderId", e.nombre as "senderNombre" 
             FROM "Mensaje" m 
-            JOIN "Usuario" u ON m."senderId" = u.id 
+            JOIN "Empresa" e ON m."senderEmpresaId" = e.id 
             WHERE m."receiverId" = $1 AND m."read" = FALSE 
             ORDER BY m."fechaEnvio" DESC LIMIT 5
         `;
@@ -82,24 +58,24 @@ router.get('/resumen/:usuarioId', async (req, res) => {
             messages: msgRes.rows
         });
     } catch (error) {
-        console.error('Error al obtener resumen:', error);
-        res.status(500).json({ error: 'Error al obtener resumen de mensajes' });
+        console.error('Error en resumen:', error);
+        res.status(500).json({ error: 'Error interno: ' + error.message });
     }
 });
 
-// ⚡ 5. MARCAR COMO LEÍDOS (NUEVO)
-// Se llama cuando el usuario entra al chat para que el contador baje a 0
-router.put('/leer/:usuarioId/:senderId', async (req, res) => {
-    const { usuarioId, senderId } = req.params;
+// 4. MARCAR COMO LEÍDOS (CORREGIDO)
+router.put('/leer/:usuarioId/:empresaId', async (req, res) => {
+    const { usuarioId, empresaId } = req.params;
     try {
+        // Marcamos como leídos los mensajes que envió esa empresa específica a este usuario
         await pool.query(
-            'UPDATE "Mensaje" SET "read" = TRUE WHERE "receiverId" = $1 AND "senderId" = $2',
-            [usuarioId, senderId]
+            'UPDATE "Mensaje" SET "read" = TRUE WHERE "receiverId" = $1 AND "senderEmpresaId" = $2 AND "read" = FALSE',
+            [usuarioId, empresaId]
         );
         res.json({ success: true });
     } catch (error) {
-        console.error('Error al marcar como leído:', error);
-        res.status(500).json({ error: 'Error al actualizar estado de mensajes' });
+        console.error('Error al leer:', error);
+        res.status(500).json({ error: error.message });
     }
 });
 

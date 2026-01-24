@@ -2,6 +2,7 @@
 const express = require('express');
 const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
+const mensajeriaRoutes = require('./routes/mensajeria');
 
 // Importar rutas
 const authRoutes = require('./routes/auth');
@@ -13,7 +14,7 @@ const prisma = new PrismaClient();
 // Middleware
 app.use(cors());
 app.use(express.json());
-
+app.use('/api/mensajeria', mensajeriaRoutes);
 // Rutas
 app.use('/api/auth', authRoutes);
 

@@ -1,9 +1,9 @@
-async function enviarMensaje(pool, { senderId, receiverId, contenido, senderType }) {
+// Cambié el nombre para que coincida con tu export
+async function enviarMensajeEmpresa(pool, { senderId, receiverId, contenido, senderType }) {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
 
-        // Determinamos quién es el remitente real para la DB
         const senderEmpresaId = senderType === 'EMPRESA' ? parseInt(senderId) : null;
         const senderUsuarioId = senderType === 'USUARIO' ? parseInt(senderId) : null;
 
@@ -32,15 +32,14 @@ async function enviarMensaje(pool, { senderId, receiverId, contenido, senderType
     }
 }
 
-// ⚡ NUEVA FUNCIÓN: Para que el historial cargue en el frontend
 async function obtenerHistorial(pool, usuarioId, empresaId) {
     const query = `
         SELECT * FROM "Mensaje"
-        WHERE ("senderEmpresaId" = $2 AND "receiverId" = $1)
-           OR ("senderUsuarioId" = $1 AND "senderType" = 'USUARIO')
+        WHERE ("senderEmpresaId" = $2 AND "receiverId" = $1) -- Mensajes de Empresa a Usuario
+           OR ("senderUsuarioId" = $1 AND "receiverId" = $2) -- Mensajes de Usuario a Empresa (CORREGIDO)
         ORDER BY "fechaEnvio" ASC;
     `;
-    const result = await pool.query(query, [usuarioId, empresaId]);
+    const result = await pool.query(query, [parseInt(usuarioId), parseInt(empresaId)]);
     return result.rows;
 }
 

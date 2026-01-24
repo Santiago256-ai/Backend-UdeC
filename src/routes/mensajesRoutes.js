@@ -4,10 +4,9 @@ import MensajeService from '../services/MensajeService.js';
 
 const router = express.Router();
 
-// 1. OBTENER HISTORIAL: GET /api/mensajeria/historial/:usuarioId/:empresaId
+// 1. OBTENER HISTORIAL (Sin cambios, está bien)
 router.get('/historial/:usuarioId/:empresaId', async (req, res) => {
     const { usuarioId, empresaId } = req.params;
-
     try {
         const mensajes = await MensajeService.obtenerHistorial(pool, usuarioId, empresaId);
         res.json(mensajes);
@@ -17,43 +16,48 @@ router.get('/historial/:usuarioId/:empresaId', async (req, res) => {
     }
 });
 
-// 2. ENVIAR MENSAJE: POST /api/mensajeria/enviar
+// 2. ENVIAR MENSAJE (Corregido para el nuevo MensajeService)
 router.post('/enviar', async (req, res) => {
-    // El frontend envía: { senderId, senderType, receiverId, contenido }
-    const { senderId, receiverId, contenido } = req.body;
+    const { senderId, receiverId, contenido, senderType } = req.body;
 
     if (!senderId || !receiverId || !contenido) {
         return res.status(400).json({ error: 'Faltan datos requeridos.' });
     }
 
     try {
-        const resultado = await MensajeService.enviarMensajeEmpresa(
-            pool, 
+        // Pasamos un objeto como espera el nuevo Service
+        const mensaje = await MensajeService.enviarMensajeEmpresa(pool, { 
             senderId, 
             receiverId, 
-            contenido
-        );
+            contenido, 
+            senderType: senderType || 'USUARIO' // Por defecto USUARIO si no viene
+        });
 
-        // Devolvemos solo el mensaje para que el frontend lo agregue a la lista
-        res.status(201).json(resultado.mensaje);
+        // Devolvemos el mensaje directamente
+        res.status(201).json(mensaje);
     } catch (error) {
         console.error('Error al enviar mensaje:', error);
         res.status(500).json({ error: 'No se pudo enviar el mensaje.' });
     }
 });
 
-// Obtener conteo de mensajes no leídos para la empresa
-router.get('/contadores-empresa/:empresaId', async (req, res) => {
-    const { empresaId } = req.params;
+// 3. CONTADORES (Corregido para que el Dashboard lo lea bien)
+router.get('/contadores/:usuarioId', async (req, res) => {
+    const { usuarioId } = req.params;
     try {
         const query = `
-            SELECT COUNT(*)::int as "unreadCount" 
+            SELECT COUNT(*)::int as "unreadMessages" 
             FROM "Mensaje" 
-            WHERE "senderEmpresaId" = $1 AND "read" = FALSE AND "senderType" = 'USUARIO';
+            WHERE "receiverId" = $1 AND "read" = FALSE;
         `;
-        const result = await pool.query(query, [empresaId]);
-        res.json(result.rows[0]);
+        const result = await pool.query(query, [usuarioId]);
+        
+        res.json({ 
+            unreadMessages: result.rows[0].unreadMessages || 0,
+            unreadNotifications: 0 
+        });
     } catch (error) {
+        console.error('Error en contadores:', error);
         res.status(500).json({ error: 'Error al obtener contadores' });
     }
 });

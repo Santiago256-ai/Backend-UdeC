@@ -89,6 +89,7 @@ model Vacante {
   empresa       Empresa       @relation(fields: [empresaId], references: [id])
 
   postulaciones Postulacion[]
+  mensajes      Mensaje[]     // <--- AÑADE ESTO
 }
 
 model Postulacion {
@@ -118,6 +119,10 @@ model Mensaje {
 
   // 🔹 Quién envía (Sender): Puede ser Usuario o Empresa (polimorfismo simulado)
   senderType    String   // 'USUARIO' o 'EMPRESA'
+
+  // --- Relación con Vacante (AÑADE ESTO) ---
+  vacanteId       Int?     // Opcional si permites chats generales, u obligatorio si solo hay chat en vacantes
+  vacante         Vacante? @relation(fields: [vacanteId], references: [id])
 
   // Si envía la empresa, su ID va aquí
   senderEmpresaId Int?

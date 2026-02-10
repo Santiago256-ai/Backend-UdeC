@@ -4,37 +4,58 @@ import MensajeService from '../services/MensajeService.js';
 
 const router = express.Router();
 
-// 1. OBTENER HISTORIAL (Sin cambios)
-router.get('/historial/:usuarioId/:empresaId', async (req, res) => {
-    const { usuarioId, empresaId } = req.params;
+// 1. OBTENER HISTORIAL (CORREGIDO: Ahora acepta vacanteId)
+router.get('/historial/:usuarioId/:empresaId/:vacanteId', async (req, res) => {
+    const { usuarioId, empresaId, vacanteId } = req.params;
     try {
-        const mensajes = await MensajeService.obtenerHistorial(pool, usuarioId, empresaId);
-        res.json(mensajes);
+        // Consultamos filtrando específicamente por la vacante para que no se mezclen los chats
+        const query = `
+            SELECT * FROM "Mensaje" 
+            WHERE "vacanteId" = $3 
+            AND (
+                ("senderUsuarioId" = $1 AND "senderEmpresaId" IS NULL) OR 
+                ("receiverId" = $1 AND "senderEmpresaId" = $2)
+            )
+            ORDER BY "fechaEnvio" ASC
+        `;
+        const result = await pool.query(query, [usuarioId, empresaId, vacanteId]);
+        res.json(result.rows);
     } catch (error) {
-        console.error('Error al obtener historial:', error);
+        console.error('Error al obtener historial por vacante:', error);
         res.status(500).json({ error: 'Error al cargar el historial.' });
     }
 });
 
-// 2. ENVIAR MENSAJE
+// 2. ENVIAR MENSAJE (CORREGIDO: Ahora guarda vacanteId)
 router.post('/enviar', async (req, res) => {
-    const { senderId, receiverId, contenido, senderType } = req.body;
+    const { senderId, receiverId, contenido, senderType, vacanteId } = req.body;
     try {
-        const mensaje = await MensajeService.enviarMensajeEmpresa(pool, { 
-            senderId, 
-            receiverId, 
-            contenido, 
-            senderType: senderType || 'USUARIO' 
-        });
-        res.status(201).json(mensaje);
+        // Usamos una consulta directa para asegurar que el vacanteId se guarde correctamente
+        const query = `
+            INSERT INTO "Mensaje" 
+            (contenido, "senderType", "receiverId", "senderUsuarioId", "senderEmpresaId", "vacanteId", "read", "fechaEnvio") 
+            VALUES ($1, $2, $3, $4, $5, $6, FALSE, NOW()) 
+            RETURNING *
+        `;
+
+        const values = [
+            contenido,
+            senderType || 'USUARIO',
+            parseInt(receiverId),
+            senderType === 'USUARIO' ? parseInt(senderId) : null,
+            senderType === 'EMPRESA' ? parseInt(senderId) : null,
+            parseInt(vacanteId)
+        ];
+
+        const result = await pool.query(query, values);
+        res.status(201).json(result.rows[0]);
     } catch (error) {
-        console.error('Error al enviar:', error);
+        console.error('Error al enviar mensaje con vacante:', error);
         res.status(500).json({ error: 'No se pudo enviar el mensaje.' });
     }
 });
 
-// 3. CONTADORES (Soluciona el Error 404 de VacantesDashboard.jsx)
-// Tu frontend está buscando "/api/mensajeria/contadores/2", añadimos esta ruta
+// 3. CONTADORES
 router.get('/contadores/:usuarioId', async (req, res) => {
     const { usuarioId } = req.params;
     try {
@@ -50,7 +71,7 @@ router.get('/contadores/:usuarioId', async (req, res) => {
     }
 });
 
-// 4. RESUMEN (Soluciona el Error 500 de NotificationBadge.jsx)
+// 4. RESUMEN
 router.get('/resumen/:usuarioId', async (req, res) => {
     const { usuarioId } = req.params;
     try {
@@ -59,7 +80,6 @@ router.get('/resumen/:usuarioId', async (req, res) => {
             [usuarioId]
         );
 
-        // JOIN corregido: Buscamos en "Empresa" porque el usuario recibe mensajes de empresas
         const msgQuery = `
             SELECT m.id, m.contenido, m."senderEmpresaId" as "senderId", e.nombre as "senderNombre" 
             FROM "Mensaje" m 
@@ -79,7 +99,7 @@ router.get('/resumen/:usuarioId', async (req, res) => {
     }
 });
 
-// 5. MARCAR COMO LEÍDOS (Soluciona el Error 500 de Mensajeria.jsx)
+// 5. MARCAR COMO LEÍDOS
 router.put('/leer/:usuarioId/:empresaId', async (req, res) => {
     const { usuarioId, empresaId } = req.params;
     try {

@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 // --- 1. ENVIAR MENSAJE ---
 router.post('/enviar', async (req, res) => {
-    const { contenido, senderType, senderId, receiverId, vacanteId} = req.body;
+    const { contenido, senderType, senderId, receiverId } = req.body;
 
     try {
         const nuevoMensaje = await prisma.mensaje.create({
@@ -13,7 +13,6 @@ router.post('/enviar', async (req, res) => {
                 contenido,
                 senderType, 
                 receiverId: parseInt(receiverId),
-                vacanteId: parseInt(vacanteId), // ⚡ FALTA ESTO: Guardar el ID de la vacante
                 // Si envía la empresa, guardamos su ID en senderEmpresaId
                 senderEmpresaId: senderType === 'EMPRESA' ? parseInt(senderId) : null,
                 // Si envía el usuario, guardamos su ID en senderUsuarioId
@@ -42,15 +41,13 @@ router.post('/enviar', async (req, res) => {
 });
 
 // --- 2. OBTENER HISTORIAL (Corregido para ser específico) ---
-router.get('/historial/:usuarioId/:empresaId/:vacanteId', async (req, res) => {
+router.get('/historial/:usuarioId/:empresaId', async (req, res) => {
     const uId = parseInt(req.params.usuarioId);
     const eId = parseInt(req.params.empresaId);
-    const vId = parseInt(req.params.vacanteId); // ⚡ Nuevo parámetro
 
     try {
         const mensajes = await prisma.mensaje.findMany({
             where: {
-                vacanteId: vId, // ⚡ FILTRO CRÍTICO: Solo mensajes de ESTA vacante
                 OR: [
                     // Mensajes enviados por la empresa al usuario
                     { senderEmpresaId: eId, receiverId: uId },

@@ -5,10 +5,18 @@ import MensajeService from '../services/MensajeService.js';
 const router = express.Router();
 
 // 1. OBTENER HISTORIAL (CORREGIDO: Ahora acepta vacanteId)
+// 1. OBTENER HISTORIAL (CORREGIDO: Ahora devuelve chatActivo)
 router.get('/historial/:usuarioId/:empresaId/:vacanteId', async (req, res) => {
     const { usuarioId, empresaId, vacanteId } = req.params;
     try {
-        // Consultamos filtrando específicamente por la vacante para que no se mezclen los chats
+        // --- NUEVA CONSULTA: Verificar estado del chat ---
+        const statusQuery = 'SELECT "chatActivo" FROM "Postulacion" WHERE "usuarioId" = $1 AND "vacanteId" = $2 LIMIT 1';
+        const statusRes = await pool.query(statusQuery, [usuarioId, vacanteId]);
+        
+        // Si no existe la postulación, por defecto asumimos true o manejamos el error
+        const chatActivo = statusRes.rows.length > 0 ? statusRes.rows[0].chatActivo : true;
+
+        // Tu consulta de mensajes original
         const query = `
             SELECT * FROM "Mensaje" 
             WHERE "vacanteId" = $3 
@@ -19,18 +27,34 @@ router.get('/historial/:usuarioId/:empresaId/:vacanteId', async (req, res) => {
             ORDER BY "fechaEnvio" ASC
         `;
         const result = await pool.query(query, [usuarioId, empresaId, vacanteId]);
-        res.json(result.rows);
+
+        // RETORNAMOS UN OBJETO con ambas informaciones
+        res.json({
+            chatActivo: chatActivo,
+            mensajes: result.rows
+        });
     } catch (error) {
         console.error('Error al obtener historial por vacante:', error);
         res.status(500).json({ error: 'Error al cargar el historial.' });
     }
 });
 
-// 2. ENVIAR MENSAJE (CORREGIDO: Ahora guarda vacanteId)
+// 2. ENVIAR MENSAJE (CORREGIDO: Con validación de chatActivo)
 router.post('/enviar', async (req, res) => {
     const { senderId, receiverId, contenido, senderType, vacanteId } = req.body;
     try {
-        // Usamos una consulta directa para asegurar que el vacanteId se guarde correctamente
+        // --- SEGURIDAD: Verificar si el chat está activo ---
+        // El "usuarioId" en la tabla Postulacion es el senderId si es USUARIO, o el receiverId si es EMPRESA enviando al postulante
+        const idPostulante = senderType === 'USUARIO' ? senderId : receiverId;
+        
+        const checkQuery = 'SELECT "chatActivo" FROM "Postulacion" WHERE "usuarioId" = $1 AND "vacanteId" = $2';
+        const checkRes = await pool.query(checkQuery, [idPostulante, vacanteId]);
+
+        if (checkRes.rows.length > 0 && checkRes.rows[0].chatActivo === false) {
+            return res.status(403).json({ error: 'El chat ha sido desactivado para esta postulación.' });
+        }
+        // ------------------------------------------------
+
         const query = `
             INSERT INTO "Mensaje" 
             (contenido, "senderType", "receiverId", "senderUsuarioId", "senderEmpresaId", "vacanteId", "read", "fechaEnvio") 
@@ -111,6 +135,19 @@ router.put('/leer/:usuarioId/:empresaId', async (req, res) => {
     } catch (error) {
         console.error('Error al leer:', error);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// 6. ACTIVAR/DESACTIVAR CHAT (Solo Empresa)
+router.patch('/status-chat', async (req, res) => {
+    const { usuarioId, vacanteId, activo } = req.body; // activo es true o false
+    try {
+        const query = 'UPDATE "Postulacion" SET "chatActivo" = $1 WHERE "usuarioId" = $2 AND "vacanteId" = $3';
+        await pool.query(query, [activo, usuarioId, vacanteId]);
+        res.json({ success: true, chatActivo: activo });
+    } catch (error) {
+        console.error('Error al cambiar estado del chat:', error);
+        res.status(500).json({ error: 'No se pudo actualizar el estado del chat.' });
     }
 });
 

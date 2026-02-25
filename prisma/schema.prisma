@@ -98,6 +98,8 @@ model Postulacion {
   cv_url    String?
   estado    String   @default("PENDIENTE")
 
+  chatActivo Boolean  @default(true)
+  
   fecha     DateTime @default(now())
 
   vacanteId Int

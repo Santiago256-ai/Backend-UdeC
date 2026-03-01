@@ -8,14 +8,11 @@ const router = express.Router();
 router.get('/historial/:usuarioId/:empresaId/:vacanteId', async (req, res) => {
     const { usuarioId, empresaId, vacanteId } = req.params;
     try {
-        // --- NUEVA CONSULTA: Verificar estado del chat ---
         const statusQuery = 'SELECT "chatActivo" FROM "Postulacion" WHERE "usuarioId" = $1 AND "vacanteId" = $2 LIMIT 1';
         const statusRes = await pool.query(statusQuery, [usuarioId, vacanteId]);
         
-        // Si no existe la postulación, por defecto asumimos true o manejamos el error
         const chatActivo = statusRes.rows.length > 0 ? statusRes.rows[0].chatActivo : true;
 
-        // Tu consulta de mensajes original
         const query = `
             SELECT * FROM "Mensaje" 
             WHERE "vacanteId" = $3 
@@ -27,7 +24,6 @@ router.get('/historial/:usuarioId/:empresaId/:vacanteId', async (req, res) => {
         `;
         const result = await pool.query(query, [usuarioId, empresaId, vacanteId]);
 
-        // RETORNAMOS UN OBJETO con ambas informaciones
         res.json({
             chatActivo: chatActivo,
             mensajes: result.rows
@@ -42,7 +38,6 @@ router.get('/historial/:usuarioId/:empresaId/:vacanteId', async (req, res) => {
 router.post('/enviar', async (req, res) => {
     const { senderId, receiverId, contenido, senderType, vacanteId } = req.body;
     try {
-        // --- SEGURIDAD: Verificar si el chat está activo ---
         const idPostulante = senderType === 'USUARIO' ? senderId : receiverId;
         
         const checkQuery = 'SELECT "chatActivo" FROM "Postulacion" WHERE "usuarioId" = $1 AND "vacanteId" = $2';
@@ -51,7 +46,6 @@ router.post('/enviar', async (req, res) => {
         if (checkRes.rows.length > 0 && checkRes.rows[0].chatActivo === false) {
             return res.status(403).json({ error: 'El chat ha sido desactivado para esta postulación.' });
         }
-        // ------------------------------------------------
 
         const query = `
             INSERT INTO "Mensaje" 
@@ -136,10 +130,7 @@ router.put('/leer/:usuarioId/:empresaId', async (req, res) => {
     }
 });
 
-// 5.5 OBTENER MIS CONVERSACIONES (RUTA FALTANTE)
-// ... código anterior ...
-
-// 5.5 OBTENER MIS CONVERSACIONES (CORREGIDO)
+// 5.5 OBTENER MIS CONVERSACIONES
 router.get('/mis-conversaciones/:usuarioId', async (req, res) => {
     const { usuarioId } = req.params;
     try {
@@ -157,8 +148,6 @@ router.get('/mis-conversaciones/:usuarioId', async (req, res) => {
             WHERE m."senderUsuarioId" = $1 OR m."receiverId" = $1
             ORDER BY m."senderEmpresaId", m."vacanteId", m."fechaEnvio" DESC
         `;
-        // Nota: Si usas MySQL, la sintaxis DISTINCT ON no funciona, 
-        // se usa GROUP BY en su lugar. Esta sintaxis es para PostgreSQL.
         
         const result = await pool.query(query, [usuarioId]);
         res.json(result.rows);
@@ -168,11 +157,9 @@ router.get('/mis-conversaciones/:usuarioId', async (req, res) => {
     }
 });
 
-// ... código posterior ...
-
 // 6. ACTIVAR/DESACTIVAR CHAT (Solo Empresa)
 router.patch('/status-chat', async (req, res) => {
-    const { usuarioId, vacanteId, activo } = req.body; // activo es true o false
+    const { usuarioId, vacanteId, activo } = req.body;
     try {
         const query = 'UPDATE "Postulacion" SET "chatActivo" = $1 WHERE "usuarioId" = $2 AND "vacanteId" = $3';
         await pool.query(query, [activo, usuarioId, vacanteId]);

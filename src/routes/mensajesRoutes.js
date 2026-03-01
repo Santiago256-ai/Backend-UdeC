@@ -5,7 +5,6 @@ import MensajeService from '../services/MensajeService.js';
 const router = express.Router();
 
 // 1. OBTENER HISTORIAL (CORREGIDO: Ahora acepta vacanteId)
-// 1. OBTENER HISTORIAL (CORREGIDO: Ahora devuelve chatActivo)
 router.get('/historial/:usuarioId/:empresaId/:vacanteId', async (req, res) => {
     const { usuarioId, empresaId, vacanteId } = req.params;
     try {
@@ -44,7 +43,6 @@ router.post('/enviar', async (req, res) => {
     const { senderId, receiverId, contenido, senderType, vacanteId } = req.body;
     try {
         // --- SEGURIDAD: Verificar si el chat está activo ---
-        // El "usuarioId" en la tabla Postulacion es el senderId si es USUARIO, o el receiverId si es EMPRESA enviando al postulante
         const idPostulante = senderType === 'USUARIO' ? senderId : receiverId;
         
         const checkQuery = 'SELECT "chatActivo" FROM "Postulacion" WHERE "usuarioId" = $1 AND "vacanteId" = $2';
@@ -135,6 +133,34 @@ router.put('/leer/:usuarioId/:empresaId', async (req, res) => {
     } catch (error) {
         console.error('Error al leer:', error);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// 5.5 OBTENER MIS CONVERSACIONES (RUTA FALTANTE)
+router.get('/mis-conversaciones/:usuarioId', async (req, res) => {
+    const { usuarioId } = req.params;
+    try {
+        const query = `
+            SELECT DISTINCT
+                e.id AS "empresaId",
+                e.nombre AS "nombreEmpresa",
+                m."vacanteId",
+                v.titulo AS "tituloVacante",
+                (SELECT contenido FROM "Mensaje" 
+                 WHERE ("senderUsuarioId" = $1 AND "senderEmpresaId" = e.id) 
+                    OR ("receiverId" = $1 AND "senderEmpresaId" = e.id)
+                 ORDER BY "fechaEnvio" DESC LIMIT 1) AS "ultimoMensaje"
+            FROM "Mensaje" m
+            JOIN "Empresa" e ON m."senderEmpresaId" = e.id OR m."receiverId" = e.id
+            JOIN "Vacante" v ON m."vacanteId" = v.id
+            WHERE m."senderUsuarioId" = $1 OR m."receiverId" = $1
+            ORDER BY "ultimoMensaje" DESC
+        `;
+        const result = await pool.query(query, [usuarioId]);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error al obtener conversaciones:', error);
+        res.status(500).json({ error: 'Error al cargar conversaciones.' });
     }
 });
 

@@ -24,6 +24,7 @@ router.get('/historial/:usuarioId/:empresaId/:vacanteId', async (req, res) => {
         `;
         const result = await pool.query(query, [usuarioId, empresaId, vacanteId]);
 
+
         res.json({
             chatActivo: chatActivo,
             mensajes: result.rows
@@ -162,6 +163,7 @@ router.get('/mis-conversaciones/:usuarioId', async (req, res) => {
 `;
         
         const result = await pool.query(query, [usuarioId]);
+        console.log("Conversaciones encontradas:", result.rows);
         res.json(result.rows);
     } catch (error) {
         console.error('Error al obtener conversaciones:', error);

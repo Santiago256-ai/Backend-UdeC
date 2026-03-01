@@ -137,25 +137,29 @@ router.put('/leer/:usuarioId/:empresaId', async (req, res) => {
 });
 
 // 5.5 OBTENER MIS CONVERSACIONES (RUTA FALTANTE)
+// ... código anterior ...
+
+// 5.5 OBTENER MIS CONVERSACIONES (CORREGIDO)
 router.get('/mis-conversaciones/:usuarioId', async (req, res) => {
     const { usuarioId } = req.params;
     try {
         const query = `
-            SELECT DISTINCT
+            SELECT DISTINCT ON (m."senderEmpresaId", m."vacanteId")
                 e.id AS "empresaId",
                 e.nombre AS "nombreEmpresa",
                 m."vacanteId",
                 v.titulo AS "tituloVacante",
-                (SELECT contenido FROM "Mensaje" 
-                 WHERE ("senderUsuarioId" = $1 AND "senderEmpresaId" = e.id) 
-                    OR ("receiverId" = $1 AND "senderEmpresaId" = e.id)
-                 ORDER BY "fechaEnvio" DESC LIMIT 1) AS "ultimoMensaje"
+                m.contenido AS "ultimoMensaje",
+                m."fechaEnvio"
             FROM "Mensaje" m
-            JOIN "Empresa" e ON m."senderEmpresaId" = e.id OR m."receiverId" = e.id
+            JOIN "Empresa" e ON (m."senderEmpresaId" = e.id OR m."receiverId" = e.id)
             JOIN "Vacante" v ON m."vacanteId" = v.id
             WHERE m."senderUsuarioId" = $1 OR m."receiverId" = $1
-            ORDER BY "ultimoMensaje" DESC
+            ORDER BY m."senderEmpresaId", m."vacanteId", m."fechaEnvio" DESC
         `;
+        // Nota: Si usas MySQL, la sintaxis DISTINCT ON no funciona, 
+        // se usa GROUP BY en su lugar. Esta sintaxis es para PostgreSQL.
+        
         const result = await pool.query(query, [usuarioId]);
         res.json(result.rows);
     } catch (error) {
@@ -163,6 +167,8 @@ router.get('/mis-conversaciones/:usuarioId', async (req, res) => {
         res.status(500).json({ error: 'Error al cargar conversaciones.' });
     }
 });
+
+// ... código posterior ...
 
 // 6. ACTIVAR/DESACTIVAR CHAT (Solo Empresa)
 router.patch('/status-chat', async (req, res) => {

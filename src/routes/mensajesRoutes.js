@@ -135,19 +135,31 @@ router.get('/mis-conversaciones/:usuarioId', async (req, res) => {
     const { usuarioId } = req.params;
     try {
         const query = `
-            SELECT DISTINCT ON (m."senderEmpresaId", m."vacanteId")
-                e.id AS "empresaId",
-                e.nombre AS "nombreEmpresa",
-                m."vacanteId",
-                v.titulo AS "tituloVacante",
-                m.contenido AS "ultimoMensaje",
-                m."fechaEnvio"
-            FROM "Mensaje" m
-            JOIN "Empresa" e ON (m."senderEmpresaId" = e.id OR m."receiverId" = e.id)
-            JOIN "Vacante" v ON m."vacanteId" = v.id
-            WHERE m."senderUsuarioId" = $1 OR m."receiverId" = $1
-            ORDER BY m."senderEmpresaId", m."vacanteId", m."fechaEnvio" DESC
-        `;
+            SELECT DISTINCT ON (
+        -- Identificamos de forma única la conversación
+        CASE WHEN m."senderEmpresaId" IS NOT NULL THEN m."senderEmpresaId" ELSE m."receiverId" END,
+        m."vacanteId"
+    )
+        e.id AS "empresaId",
+        e.nombre AS "nombreEmpresa",
+        m."vacanteId",
+        v.titulo AS "tituloVacante",
+        m.contenido AS "ultimoMensaje",
+        m."fechaEnvio"
+    FROM "Mensaje" m
+    -- Aseguramos traer la empresa correcta independientemente de quién envió el último mensaje
+    JOIN "Empresa" e ON (
+        (m."senderEmpresaId" IS NOT NULL AND m."senderEmpresaId" = e.id) OR 
+        (m."senderEmpresaId" IS NULL AND m."receiverId" = e.id)
+    )
+    JOIN "Vacante" v ON m."vacanteId" = v.id
+    WHERE m."senderUsuarioId" = $1 OR m."receiverId" = $1
+    -- Ordenamos igual que el DISTINCT ON
+    ORDER BY 
+        CASE WHEN m."senderEmpresaId" IS NOT NULL THEN m."senderEmpresaId" ELSE m."receiverId" END, 
+        m."vacanteId", 
+        m."fechaEnvio" DESC
+`;
         
         const result = await pool.query(query, [usuarioId]);
         res.json(result.rows);

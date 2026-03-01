@@ -131,39 +131,46 @@ router.put('/leer/:usuarioId/:empresaId', async (req, res) => {
     }
 });
 
-// 5.5 OBTENER MIS CONVERSACIONES
+// 5.5 OBTENER MIS CONVERSACIONES (Corregida y Robusta)
 router.get('/mis-conversaciones/:usuarioId', async (req, res) => {
     const { usuarioId } = req.params;
     try {
         const query = `
             SELECT DISTINCT ON (
-        -- Identificamos de forma única la conversación
-        CASE WHEN m."senderEmpresaId" IS NOT NULL THEN m."senderEmpresaId" ELSE m."receiverId" END,
-        m."vacanteId"
-    )
-        e.id AS "empresaId",
-        e.nombre AS "nombreEmpresa",
-        m."vacanteId",
-        v.titulo AS "tituloVacante",
-        m.contenido AS "ultimoMensaje",
-        m."fechaEnvio"
-    FROM "Mensaje" m
-    -- Aseguramos traer la empresa correcta independientemente de quién envió el último mensaje
-    JOIN "Empresa" e ON (
-        (m."senderEmpresaId" IS NOT NULL AND m."senderEmpresaId" = e.id) OR 
-        (m."senderEmpresaId" IS NULL AND m."receiverId" = e.id)
-    )
-    JOIN "Vacante" v ON m."vacanteId" = v.id
-    WHERE m."senderUsuarioId" = $1 OR m."receiverId" = $1
-    -- Ordenamos igual que el DISTINCT ON
-    ORDER BY 
-        CASE WHEN m."senderEmpresaId" IS NOT NULL THEN m."senderEmpresaId" ELSE m."receiverId" END, 
-        m."vacanteId", 
-        m."fechaEnvio" DESC
-`;
+                -- Identificamos de forma única la conversación
+                empresa_id,
+                m."vacanteId"
+            )
+                empresa_id AS "empresaId",
+                e.nombre AS "nombreEmpresa",
+                m."vacanteId",
+                v.titulo AS "tituloVacante",
+                m.contenido AS "ultimoMensaje",
+                m."fechaEnvio"
+            FROM "Mensaje" m
+            -- 1. Identificamos qué ID corresponde a la empresa en esta conversación
+            LEFT JOIN LATERAL (
+                SELECT CASE 
+                    WHEN m."senderEmpresaId" IS NOT NULL THEN m."senderEmpresaId"
+                    ELSE m."receiverId"
+                END AS empresa_id
+            ) AS lateral_empresa ON TRUE
+            -- 2. Hacemos JOIN con la tabla Empresa usando el ID identificado
+            LEFT JOIN "Empresa" e ON lateral_empresa.empresa_id = e.id
+            JOIN "Vacante" v ON m."vacanteId" = v.id
+            WHERE m."senderUsuarioId" = $1 OR m."receiverId" = $1
+            -- 3. Ordenamos por fecha para obtener el último mensaje
+            ORDER BY 
+                empresa_id, 
+                m."vacanteId", 
+                m."fechaEnvio" DESC
+        `;
         
         const result = await pool.query(query, [usuarioId]);
+        
+        // Log para depurar en el backend
         console.log("Conversaciones encontradas:", result.rows);
+        
         res.json(result.rows);
     } catch (error) {
         console.error('Error al obtener conversaciones:', error);

@@ -38,6 +38,10 @@ router.get('/historial/:usuarioId/:empresaId/:vacanteId', async (req, res) => {
 // 2. ENVIAR MENSAJE (CORREGIDO: Con validación de chatActivo)
 router.post('/enviar', async (req, res) => {
     const { senderId, receiverId, contenido, senderType, vacanteId } = req.body;
+    // ⬇️ Validación básica en backend
+    if (!senderId || !receiverId || !contenido || !vacanteId) {
+        return res.status(400).json({ error: 'Datos de mensaje incompletos.' });
+    }
     try {
         const idPostulante = senderType === 'USUARIO' ? senderId : receiverId;
         
@@ -67,8 +71,8 @@ router.post('/enviar', async (req, res) => {
         const result = await pool.query(query, values);
         res.status(201).json(result.rows[0]);
     } catch (error) {
-        console.error('Error al enviar mensaje con vacante:', error);
-        res.status(500).json({ error: 'No se pudo enviar el mensaje.' });
+        console.error('Error completo:', error); 
+        res.status(500).json({ error: 'Detalle: ' + error.message });
     }
 });
 

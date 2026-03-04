@@ -88,6 +88,11 @@ model Vacante {
   empresaId     Int
   empresa       Empresa       @relation(fields: [empresaId], references: [id])
 
+  // Agrega estas líneas:
+  fechaCierre       DateTime?
+  limitePostulantes Int?
+  estado            String    @default("ABIERTA")
+
   postulaciones Postulacion[]
   mensajes      Mensaje[]     // <--- AÑADE ESTO
 }

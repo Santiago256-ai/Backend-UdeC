@@ -24,13 +24,12 @@ router.get('/historial/:usuarioId/:empresaId/:vacanteId', async (req, res) => {
         `;
         const result = await pool.query(query, [usuarioId, empresaId, vacanteId]);
 
-
         res.json({
             chatActivo: chatActivo,
             mensajes: result.rows
         });
     } catch (error) {
-        console.error('Error al obtener historial por vacante:', error);
+        // BORRADO: console.error('Error al obtener historial por vacante:', error);
         res.status(500).json({ error: 'Error al cargar el historial.' });
     }
 });
@@ -38,10 +37,12 @@ router.get('/historial/:usuarioId/:empresaId/:vacanteId', async (req, res) => {
 // 2. ENVIAR MENSAJE (CORREGIDO: Con validación de chatActivo)
 router.post('/enviar', async (req, res) => {
     const { senderId, receiverId, contenido, senderType, vacanteId } = req.body;
-    // ⬇️ Validación básica en backend
+    
+    // Validación básica en backend
     if (!senderId || !receiverId || !contenido || !vacanteId) {
         return res.status(400).json({ error: 'Datos de mensaje incompletos.' });
     }
+    
     try {
         const idPostulante = senderType === 'USUARIO' ? senderId : receiverId;
         
@@ -71,8 +72,8 @@ router.post('/enviar', async (req, res) => {
         const result = await pool.query(query, values);
         res.status(201).json(result.rows[0]);
     } catch (error) {
-        console.error('Error completo:', error); 
-        res.status(500).json({ error: 'Detalle: ' + error.message });
+        // BORRADO: console.error('Error completo:', error); 
+        res.status(500).json({ error: 'No se pudo enviar el mensaje.' });
     }
 });
 
@@ -87,7 +88,7 @@ router.get('/contadores/:usuarioId', async (req, res) => {
             unreadNotifications: 0 
         });
     } catch (error) {
-        console.error('Error en contadores:', error);
+        // BORRADO: console.error('Error en contadores:', error);
         res.status(500).json({ error: 'Error al obtener contadores' });
     }
 });
@@ -115,8 +116,8 @@ router.get('/resumen/:usuarioId', async (req, res) => {
             messages: msgRes.rows
         });
     } catch (error) {
-        console.error('Error en resumen:', error);
-        res.status(500).json({ error: 'Error interno: ' + error.message });
+        // BORRADO: console.error('Error en resumen:', error);
+        res.status(500).json({ error: 'Error interno.' });
     }
 });
 
@@ -130,8 +131,8 @@ router.put('/leer/:usuarioId/:empresaId', async (req, res) => {
         );
         res.json({ success: true });
     } catch (error) {
-        console.error('Error al leer:', error);
-        res.status(500).json({ error: error.message });
+        // BORRADO: console.error('Error al leer:', error);
+        res.status(500).json({ error: 'Error al marcar mensajes.' });
     }
 });
 
@@ -141,7 +142,6 @@ router.get('/mis-conversaciones/:usuarioId', async (req, res) => {
     try {
         const query = `
             SELECT DISTINCT ON (
-                -- Identificamos de forma única la conversación
                 empresa_id,
                 m."vacanteId"
             )
@@ -152,18 +152,15 @@ router.get('/mis-conversaciones/:usuarioId', async (req, res) => {
                 m.contenido AS "ultimoMensaje",
                 m."fechaEnvio"
             FROM "Mensaje" m
-            -- 1. Identificamos qué ID corresponde a la empresa en esta conversación
             LEFT JOIN LATERAL (
                 SELECT CASE 
                     WHEN m."senderEmpresaId" IS NOT NULL THEN m."senderEmpresaId"
                     ELSE m."receiverId"
                 END AS empresa_id
             ) AS lateral_empresa ON TRUE
-            -- 2. Hacemos JOIN con la tabla Empresa usando el ID identificado
             LEFT JOIN "Empresa" e ON lateral_empresa.empresa_id = e.id
             JOIN "Vacante" v ON m."vacanteId" = v.id
             WHERE m."senderUsuarioId" = $1 OR m."receiverId" = $1
-            -- 3. Ordenamos por fecha para obtener el último mensaje
             ORDER BY 
                 empresa_id, 
                 m."vacanteId", 
@@ -172,12 +169,11 @@ router.get('/mis-conversaciones/:usuarioId', async (req, res) => {
         
         const result = await pool.query(query, [usuarioId]);
         
-        // Log para depurar en el backend
-        console.log("Conversaciones encontradas:", result.rows);
+        // BORRADO: console.log("Conversaciones encontradas:", result.rows);
         
         res.json(result.rows);
     } catch (error) {
-        console.error('Error al obtener conversaciones:', error);
+        // BORRADO: console.error('Error al obtener conversaciones:', error);
         res.status(500).json({ error: 'Error al cargar conversaciones.' });
     }
 });
@@ -190,7 +186,7 @@ router.patch('/status-chat', async (req, res) => {
         await pool.query(query, [activo, usuarioId, vacanteId]);
         res.json({ success: true, chatActivo: activo });
     } catch (error) {
-        console.error('Error al cambiar estado del chat:', error);
+        // BORRADO: console.error('Error al cambiar estado del chat:', error);
         res.status(500).json({ error: 'No se pudo actualizar el estado del chat.' });
     }
 });

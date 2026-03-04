@@ -1,6 +1,6 @@
 import prisma from "../prismaClient.js";
 
-// 🟢 1. Crear una nueva vacante (CORREGIDO con validación de ID de empresa)
+// 🟢 1. Crear una nueva vacante (CORREGIDO con límites y validación de empresa)
 export const crearVacante = async (req, res) => {
     try {
         console.log("📩 Datos recibidos:", req.body);
@@ -12,28 +12,28 @@ export const crearVacante = async (req, res) => {
             tipo,
             modalidad,
             salario,
-            empresaId // Clave para la relación
+            empresaId,
+            // 🆕 Nuevos campos recibidos
+            fechaCierre,
+            limitePostulantes 
         } = req.body;
 
         // --- INICIO DE VALIDACIÓN MEJORADA ---
 
-        // 1. Validación de campos obligatorios de la vacante
+        // 1. Validación de campos obligatorios básicos
         if (!titulo || !descripcion || !ubicacion || !tipo || !modalidad) {
-            console.error("❌ ERROR 400: Faltan datos de la vacante.");
-            return res.status(400).json({ error: "Faltan campos obligatorios de la vacante (título, descripción, ubicación, tipo, modalidad)." });
+            console.error("❌ ERROR 400: Faltan datos obligatorios.");
+            return res.status(400).json({ error: "Faltan campos obligatorios (título, descripción, ubicación, tipo, modalidad)." });
         }
         
         // 2. ✅ VALIDACIÓN CRÍTICA: ID de la Empresa
         const idEmpresaNumerico = parseInt(empresaId);
-
         if (!empresaId || isNaN(idEmpresaNumerico) || idEmpresaNumerico <= 0) {
-            console.error(`❌ ERROR 401/400: ID de empresa inválido o ausente. Valor: ${empresaId}`);
-            // Usamos 401 (No Autorizado) si falta el ID de la sesión.
-            return res.status(401).json({ error: "No autorizado. El ID de la empresa no es válido o la sesión no se cargó correctamente." });
+            console.error(`❌ ERROR 401: ID de empresa inválido. Valor: ${empresaId}`);
+            return res.status(401).json({ error: "No autorizado. Sesión de empresa no válida." });
         }
 
-        // --- FIN DE VALIDACIÓN MEJORADA ---
-
+        // --- FIN DE VALIDACIÓN ---
 
         const vacante = await prisma.vacante.create({
             data: { 
@@ -42,80 +42,90 @@ export const crearVacante = async (req, res) => {
                 ubicacion,
                 tipo,
                 modalidad,
-                salario: salario || null, // Si es String y está vacío, usamos null
-                empresaId: idEmpresaNumerico, // Usamos el ID ya convertido y validado
+                salario: salario || null,
+                empresaId: idEmpresaNumerico,
+                // 🆕 Guardado de nuevos campos con formateo de tipos
+                fechaCierre: fechaCierre ? new Date(fechaCierre) : null,
+                limitePostulantes: limitePostulantes ? parseInt(limitePostulantes) : null,
+                estado: "ABIERTA" // Estado por defecto
             },
         });
 
-        console.log("✅ Vacante creada:", vacante);
+        console.log("✅ Vacante creada exitosamente:", vacante.id);
         res.status(201).json(vacante);
 
     } catch (error) {
-        // Esto captura errores de Prisma (ej: La FK empresaId no existe en la tabla empresa)
         console.error("❌ Error 500 al crear vacante:", error.message);
-        res.status(500).json({ error: "Error interno al crear la vacante. Verifique el log del servidor. (Posible error de Clave Foránea)." });
+        res.status(500).json({ error: "Error interno al crear la vacante. Verifique la conexión a la base de datos." });
     }
 };
 
 // 🟡 2. Listar vacantes por ID de empresa
 export const listarVacantesPorEmpresa = async (req, res) => {
-    try {
-        const empresaId = parseInt(req.params.id); 
+    try {
+        const empresaId = parseInt(req.params.id); 
 
-        if (isNaN(empresaId)) {
-            return res.status(400).json({ error: "ID de empresa inválido." });
-        }
+        if (isNaN(empresaId)) {
+            return res.status(400).json({ error: "ID de empresa inválido." });
+        }
 
-        const vacantes = await prisma.vacante.findMany({
-            where: { empresaId: empresaId }, 
-            orderBy: { id: "desc" },
-        });
+        const vacantes = await prisma.vacante.findMany({
+            where: { empresaId: empresaId }, 
+            orderBy: { id: "desc" },
+        });
 
-        res.json(vacantes);
-    } catch (error) {
-        console.error("❌ Error al listar vacantes por empresa:", error);
-        res.status(500).json({ error: "Error interno al listar las vacantes." });
-    }
+        res.json(vacantes);
+    } catch (error) {
+        console.error("❌ Error al listar vacantes por empresa:", error);
+        res.status(500).json({ error: "Error interno al listar las vacantes." });
+    }
 };
 
-// 🟡 3. Listar todas las vacantes
+// 🟡 3. Listar todas las vacantes (Para el feed de estudiantes)
 export const listarVacantes = async (req, res) => {
-    try {
-        const vacantes = await prisma.vacante.findMany({
-            orderBy: { id: "desc" },
-        });
-        res.json(vacantes);
-    } catch (error) {
-        console.error("❌ Error al listar vacantes:", error);
-        res.status(500).json({ error: "Error interno al listar vacantes." });
-    }
+    try {
+        const vacantes = await prisma.vacante.findMany({
+            where: {
+                // Opcional: Solo mostrar vacantes abiertas
+                estado: "ABIERTA"
+            },
+            orderBy: { id: "desc" },
+        });
+        res.json(vacantes);
+    } catch (error) {
+        console.error("❌ Error al listar vacantes:", error);
+        res.status(500).json({ error: "Error interno al listar vacantes." });
+    }
 };
 
 // 🔴 4. Eliminar una vacante por ID
 export const eliminarVacante = async (req, res) => {
-    try {
-        const { id } = req.params;
+    try {
+        const { id } = req.params;
+        const idNumerico = parseInt(id);
 
-        if (!id) {
-            return res.status(400).json({ error: "El ID de la vacante es obligatorio." });
-        }
+        if (isNaN(idNumerico)) {
+            return res.status(400).json({ error: "El ID de la vacante es obligatorio y debe ser numérico." });
+        }
 
-        const vacanteExistente = await prisma.vacante.findUnique({
-            where: { id: parseInt(id) },
-        });
+        const vacanteExistente = await prisma.vacante.findUnique({
+            where: { id: idNumerico },
+        });
 
-        if (!vacanteExistente) {
-            return res.status(404).json({ error: "Vacante no encontrada." });
-        }
+        if (!vacanteExistente) {
+            return res.status(404).json({ error: "Vacante no encontrada." });
+        }
 
-        await prisma.vacante.delete({
-            where: { id: parseInt(id) },
-        });
+        // Primero eliminamos la vacante (Prisma se encarga si hay Cascade, 
+        // de lo contrario asegúrate de que no haya postulaciones huérfanas)
+        await prisma.vacante.delete({
+            where: { id: idNumerico },
+        });
 
-        console.log("🗑️ Vacante eliminada:", id);
-        res.json({ message: "Vacante eliminada correctamente." });
-    } catch (error) {
-        console.error("❌ Error al eliminar vacante:", error);
-        res.status(500).json({ error: "Error interno al eliminar vacante." });
-    }
+        console.log("🗑️ Vacante eliminada:", id);
+        res.json({ message: "Vacante eliminada correctamente." });
+    } catch (error) {
+        console.error("❌ Error al eliminar vacante:", error);
+        res.status(500).json({ error: "Error interno al eliminar vacante." });
+    }
 };

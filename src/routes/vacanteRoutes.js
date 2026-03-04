@@ -1,23 +1,27 @@
 import express from "express";
 import { 
-    crearVacante, 
-    listarVacantes, 
-    eliminarVacante, 
-    listarVacantesPorEmpresa
+    crearVacante, 
+    listarVacantes, 
+    eliminarVacante, 
+    listarVacantesPorEmpresa,
+    // obtenerVacantePorId // 👈 Agrégalo cuando crees la función en el controller
 } from "../controllers/vacanteController.js"; 
 
 const router = express.Router();
 
-// 🟢 Crear vacante (POST /) se convierte en POST /api/vacantes
+// 🟢 Crear vacante
 router.post("/", crearVacante); 
 
-// 🟢 Listar TODAS las vacantes (GET /) se convierte en GET /api/vacantes
+// 🟢 Listar TODAS las vacantes
 router.get("/", listarVacantes); 
 
-// ✅ Listar vacantes por ID de empresa (GET /empresa/:id) se convierte en GET /api/vacantes/empresa/:id
+// ✅ Listar vacantes por ID de empresa
 router.get("/empresa/:id", listarVacantesPorEmpresa);
 
-// Eliminar vacante (DELETE /:id) se convierte en DELETE /api/vacantes/:id
+// 🔍 Obtener UNA sola vacante por su ID (Muy útil para ver detalles o iniciar chats)
+// router.get("/:id", obtenerVacantePorId); 
+
+// 🔴 Eliminar vacante
 router.delete("/:id", eliminarVacante);
 
 export default router;

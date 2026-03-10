@@ -39,28 +39,36 @@ router.post('/enviar', async (req, res) => {
     }
 });
 
-// --- 2. OBTENER HISTORIAL (Corregido: añadida vacanteId para evitar el 404) ---
+// --- 2. OBTENER HISTORIAL ---
 router.get('/historial/:usuarioId/:empresaId/:vacanteId', async (req, res) => {
     const uId = parseInt(req.params.usuarioId);
-    const eId = parseInt(req.params.empresaId);
     const vId = parseInt(req.params.vacanteId);
 
     try {
+        // 1. Buscamos la postulación para ver el estado real de 'chatActivo'
+        const postulacion = await prisma.postulacion.findFirst({
+            where: { 
+                usuarioId: uId, 
+                vacanteId: vId 
+            }
+        });
+
+        // 2. Buscamos los mensajes
         const mensajes = await prisma.mensaje.findMany({
             where: {
-                vacanteId: vId, // Filtramos por la vacante específica
+                vacanteId: vId,
                 OR: [
-                    { senderEmpresaId: eId, receiverId: uId },
-                    { senderUsuarioId: uId, receiverId: eId }
+                    { senderEmpresaId: parseInt(req.params.empresaId), receiverId: uId },
+                    { senderUsuarioId: uId, receiverId: parseInt(req.params.empresaId) }
                 ]
             },
             orderBy: { fechaEnvio: 'asc' }
         });
         
-        // Enviamos un objeto que incluya la bandera de chat activo
         res.json({
             mensajes: mensajes,
-            chatActivo: true // Puedes añadir lógica aquí para cerrar chats si la vacante expiró
+            // Si no encuentra la postulación por alguna razón, por defecto es true
+            chatActivo: postulacion ? postulacion.chatActivo : true 
         });
     } catch (error) {
         res.status(500).json({ error: "Error al cargar historial" });
@@ -125,19 +133,22 @@ router.get('/mis-conversaciones/:usuarioId', async (req, res) => {
 router.patch('/status-chat', async (req, res) => {
     const { usuarioId, vacanteId, activo } = req.body;
 
-    if (!usuarioId || !vacanteId) {
-        return res.status(400).json({ error: "Faltan datos (usuarioId o vacanteId)" });
-    }
-
     try {
-        // NOTA: Aquí depende de si tienes una tabla 'ChatEstado' o similar.
-        // Si solo quieres que el backend responda "OK" para que no de error:
-        console.log(`Usuario ${usuarioId} en vacante ${vacanteId} está activo: ${activo}`);
+        // Actualizamos el campo 'chatActivo' en la tabla Postulacion
+        await prisma.postulacion.updateMany({
+            where: {
+                usuarioId: parseInt(usuarioId),
+                vacanteId: parseInt(vacanteId)
+            },
+            data: { 
+                chatActivo: activo 
+            }
+        });
         
-        res.json({ success: true, message: "Estado de presencia actualizado" });
+        res.json({ success: true, message: "Estado actualizado en la base de datos" });
     } catch (error) {
         console.error("Error al actualizar status:", error);
-        res.status(500).json({ error: "No se pudo actualizar el estado" });
+        res.status(500).json({ error: "No se pudo actualizar el estado en la DB" });
     }
 });
 

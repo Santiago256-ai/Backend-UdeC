@@ -1,33 +1,30 @@
 // src/middleware/authMiddleware.js
+import prisma from "../prismaClient.js";
 
 export const authMiddleware = async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
         
-        console.log("Header recibido:", authHeader);
-
-        // 1. Validamos que el header exista y tenga formato Bearer
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
-            return res.status(401).json({ message: "No autorizado: Token faltante o formato incorrecto" });
+        if (!authHeader) {
+            return res.status(401).json({ message: "No autorizado" });
         }
 
-        // 2. Extraemos el token después de "Bearer "
-        const token = authHeader.split(" ")[1];
+        // El token ahora es el ID que guardamos en localStorage
+        const userId = parseInt(authHeader); 
 
-        // 3. Verificamos que no sea la palabra "null"
-        if (!token || token === "null" || token === "undefined") {
-             return res.status(401).json({ message: "No autorizado: Token nulo" });
+        const usuario = await prisma.usuario.findUnique({
+            where: { id: userId }
+        });
+
+        if (!usuario) {
+            return res.status(401).json({ message: "Usuario no encontrado" });
         }
 
-        // --- AQUÍ LA MEJORA ---
-        // Si más adelante decides usar JWT, aquí verificarías el token con jsonwebtoken:
-        // const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        // req.user = decoded;
-
-        // Por ahora, permitimos el paso a la siguiente función
+        // Inyectamos el usuario para que la ruta lo use
+        req.user = usuario; 
+        
         next();
     } catch (error) {
-        console.error("Error en authMiddleware:", error.message);
-        return res.status(403).json({ message: "No autorizado: Error en la validación" });
+        return res.status(403).json({ message: "Error en la validación" });
     }
 };

@@ -8,6 +8,11 @@ const prisma = new PrismaClient();
 router.post('/enviar', async (req, res) => {
     const { contenido, senderType, senderId, receiverId } = req.body;
 
+    // Validación básica para evitar errores de base de datos
+    if (!contenido || !senderId || !receiverId) {
+        return res.status(400).json({ error: "Faltan campos obligatorios" });
+    }
+
     try {
         const nuevoMensaje = await prisma.mensaje.create({
             data: {
@@ -16,7 +21,7 @@ router.post('/enviar', async (req, res) => {
                 receiverId: parseInt(receiverId),
                 senderEmpresaId: senderType === 'EMPRESA' ? parseInt(senderId) : null,
                 senderUsuarioId: senderType === 'USUARIO' ? parseInt(senderId) : null,
-                
+                // Si es empresa, crea la notificación en la misma transacción
                 ...(senderType === 'EMPRESA' && {
                     notificacion: {
                         create: {
@@ -30,12 +35,12 @@ router.post('/enviar', async (req, res) => {
         });
         res.status(201).json(nuevoMensaje);
     } catch (error) {
-        console.error("Error en POST /enviar:", error);
-        res.status(500).json({ error: "Error al enviar mensaje" });
+        console.error("Error en DB:", error.message);
+        res.status(500).json({ error: "No se pudo conectar con la base de datos" });
     }
 });
 
-// --- 2. OBTENER HISTORIAL ---
+// --- 2. OBTENER HISTORIAL (Filtrado privado corregido) ---
 router.get('/historial/:usuarioId/:empresaId', async (req, res) => {
     const uId = parseInt(req.params.usuarioId);
     const eId = parseInt(req.params.empresaId);
@@ -44,30 +49,16 @@ router.get('/historial/:usuarioId/:empresaId', async (req, res) => {
         const mensajes = await prisma.mensaje.findMany({
             where: {
                 OR: [
-                    { senderEmpresaId: eId, receiverId: uId },
-                    { senderUsuarioId: uId, senderType: 'USUARIO' } 
+                    { senderEmpresaId: eId, receiverId: uId }, // Mensaje de Empresa a Usuario
+                    { senderUsuarioId: uId, receiverId: eId }  // Mensaje de Usuario a Empresa (Corregido)
                 ]
             },
             orderBy: { fechaEnvio: 'asc' }
         });
         res.json(mensajes);
     } catch (error) {
-        res.status(500).json({ error: "Error al cargar historial" });
+        res.status(500).json({ error: "Error al cargar historial de la base de datos" });
     }
 });
 
-// --- 3. CONTADORES ---
-router.get('/contadores/:usuarioId', async (req, res) => {
-    const userId = parseInt(req.params.usuarioId);
-    try {
-        const [mensajes, notificaciones] = await Promise.all([
-            prisma.mensaje.count({ where: { receiverId: userId, read: false } }),
-            prisma.notificacion.count({ where: { usuarioId: userId, vista: false } })
-        ]);
-        res.json({ unreadMessages: mensajes, unreadNotifications: notificaciones });
-    } catch (error) {
-        res.status(500).json({ error: "Error en contadores" });
-    }
-});
-
-export default router; // IMPORTANTE: Usar export default para ES Modules
+export default router;

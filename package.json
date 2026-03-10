@@ -8,7 +8,8 @@
     "postinstall": "prisma generate",
     "build": "prisma generate",
     "dev": "nodemon src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "vercel-build": "prisma generate"
   },
   "dependencies": {
     "@azure/msal-browser": "^4.24.1",

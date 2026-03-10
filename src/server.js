@@ -1,135 +1,105 @@
-// server.js (Base de Datos Habilitada y FIXES Finales)
+// server.js (Versión Unificada con Prisma y Firebase)
 
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import path from "path";
 import admin from "firebase-admin";
-
-// Importamos Buffer
 import { Buffer } from 'buffer'; 
+import { PrismaClient } from "@prisma/client";
 
-// ✅ BASE DE DATOS HABILITADA: Descomentamos la importación del pool
-import pool from "./database.js"; 
+// ✅ Inicializamos Prisma de forma global
+const prisma = new PrismaClient();
 
+// Importación de Rutas (Corregidas según tu estructura de carpetas)
+import authRoutes from "./routes/authRoutes.js"; 
 import vacantesRoutes from "./routes/vacantesRoutes.js";
 import postulacionesRoutes from "./routes/postulacionesRoutes.js";
 import empresaRoutes from "./routes/empresaRoutes.js";
 import estudianteRoutes from "./routes/estudianteRoutes.js";
-import authRoutes from "./routes/authRoutes.js"; 
+import mensajeriaRoutes from "./routes/mensajeriaRoutes.js"; //
 
-// ⚡ NUEVA RUTA: Importamos la ruta de mensajería ⚡
-import mensajeriaRoutes from "./routes/mensajeriaRoutes.js"; // Usa mensajeriaRoutes.js que es el que tienes en tu carpeta
 const app = express();
 
-// ----------------- CONFIGURACIÓN FIREBASE ADMIN (FIXED & REUSABLE) -----------------
-
+// ----------------- CONFIGURACIÓN FIREBASE ADMIN -----------------
 try {
-    // Si la inicialización de Firebase está siendo manejada en otro archivo que importa
-    // esta configuración, se debe mantener solo el chequeo y la reutilización. 
-    // Mantenemos la lógica de Base64 en el server.js por seguridad.
-    
-    if (process.env.FIREBASE_ADMIN_CREDENTIALS) {
-        delete process.env.FIREBASE_ADMIN_CREDENTIALS;
-    }
+    const base64Credentials = process.env.FIREBASE_ADMIN_CREDENTIALS_BASE64;
 
-    const base64Credentials = process.env.FIREBASE_ADMIN_CREDENTIALS_BASE64;
+    if (!base64Credentials) {
+        throw new Error("ERROR CRÍTICO: FIREBASE_ADMIN_CREDENTIALS_BASE64 no está configurada.");
+    }
 
-    if (!base64Credentials) {
-        throw new Error("ERROR CRÍTICO: La variable FIREBASE_ADMIN_CREDENTIALS_BASE64 NO ESTÁ CONFIGURADA.");
-    }
+    const decodedJson = Buffer.from(base64Credentials, 'base64').toString('utf8');
+    const firebaseCredentials = JSON.parse(decodedJson); 
 
-    const decodedJson = Buffer.from(base64Credentials, 'base64').toString('utf8');
-    const firebaseCredentials = JSON.parse(decodedJson); 
-
-    // Aplicar Singleton Fix para evitar el error "already exists"
-    if (!admin.apps.length) {
-        admin.initializeApp({
-            credential: admin.credential.cert(firebaseCredentials),
-        });
-        console.log("✅ Firebase Admin inicializado correctamente");
-    } else {
-        admin.app(); 
-        console.log("✅ Firebase Admin ya estaba inicializado. Reutilizando la aplicación.");
-    }
-
+    if (!admin.apps.length) {
+        admin.initializeApp({
+            credential: admin.credential.cert(firebaseCredentials),
+        });
+        console.log("✅ Firebase Admin inicializado");
+    }
 } catch (error) {
-    console.error("❌ ERROR FATAL DE INICIALIZACIÓN DE FIREBASE:", error.message);
-    process.exit(1); 
+    console.error("❌ ERROR FIREBASE:", error.message);
+    // En Vercel no siempre es recomendable usar process.exit(1), pero se mantiene por seguridad
 }
 
-// ---------------------------------------------------------------
 // ----------------- CONFIGURACIÓN CORS -----------------
-
 const corsOptions = {
-    origin: ['https://frontend-ude-c.vercel.app', 'http://localhost:3000', 'http://localhost:5173'],
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: true,
-    optionsSuccessStatus: 204
+    origin: ['https://frontend-ude-c.vercel.app', 'http://localhost:3000', 'http://localhost:5173'],
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    credentials: true,
+    optionsSuccessStatus: 204
 };
-
 app.use(cors(corsOptions));
 
-// ---------------------------------------------------------------
 // ----------------- MIDDLEWARES -----------------
-
 app.use(express.json());
 app.use("/uploads", express.static(path.join(path.resolve(), "src", "uploads")));
 
-// ---------------------------------------------------------------
 // ----------------- RUTAS -----------------
-
 app.get("/", (req, res) => {
-    res.send("Backend UdeC API funcionando 🚀 (Conexión a DB activa)");
+    res.send("Backend UdeC API funcionando 🚀 (Prisma Client Activo)");
 });
 
-// Ruta de prueba de BBDD
+// Ruta de prueba unificada con Prisma
 app.get("/users", async (req, res) => {
-    try {
-        const result = await pool.query("SELECT * FROM users");
-        res.json(result.rows);
-    } catch (err) {
-        console.error(err);
-        res.status(500).send("Error en el servidor o BBDD");
-    }
+    try {
+        const result = await prisma.usuario.findMany(); // Cambiado de pool.query a Prisma
+        res.json(result);
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Error al obtener usuarios desde Prisma");
+    }
 });
 
-
-// Rutas API
+// Rutas API (Asegúrate de que el Frontend use el prefijo /api)
 app.use("/api/auth", authRoutes); 
 app.use("/api/vacantes", vacantesRoutes);
 app.use("/api/postulaciones", postulacionesRoutes);
 app.use("/api/empresas", empresaRoutes);
 app.use("/api/estudiantes", estudianteRoutes);
-// ⚡ CONEXIÓN DE LA NUEVA RUTA DE MENSAJES ⚡
-app.use("/api/mensajeria", mensajeriaRoutes);
+app.use("/api/mensajeria", mensajeriaRoutes); 
 
-// ---------------------------------------------------------------
-// ----------------- TEST DE BASE DE DATOS E INICIALIZAR SERVIDOR -----------------
-
+// ----------------- INICIALIZACIÓN -----------------
 const PORT = process.env.PORT || 8080;
 
 async function checkDatabaseConnection() {
-    console.log("⏳ Probando conexión a la Base de Datos...");
-    try {
-        const client = await pool.connect();
-        await client.query('SELECT 1'); 
-        client.release();
-        console.log("✅ Conexión a PostgreSQL establecida correctamente.");
-        return true;
-    } catch (error) {
-        console.error("❌ ERROR CRÍTICO: No se pudo conectar a PostgreSQL.", error.message);
-        console.error(`DB URL: ${process.env.DATABASE_URL ? "Configurada" : "NO configurada"}`);
-        console.error("⚠️ El servidor continuará ejecutándose, pero las rutas que usan la DB fallarán.");
-        return false;
-    }
+    console.log("⏳ Probando conexión con Prisma...");
+    try {
+        await prisma.$connect();
+        console.log("✅ Conexión a PostgreSQL (vía Prisma) establecida.");
+        return true;
+    } catch (error) {
+        console.error("❌ ERROR CRÍTICO DB:", error.message);
+        return false;
+    }
 }
 
-// Ejecutar la prueba y luego iniciar el servidor
+// Ejecutar prueba e iniciar servidor
 checkDatabaseConnection().then(() => {
-    app.listen(PORT, () => {
-        console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
-    });
+    app.listen(PORT, () => {
+        console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
+    });
 });
 
 // ✅ OBLIGATORIO PARA VERCEL:

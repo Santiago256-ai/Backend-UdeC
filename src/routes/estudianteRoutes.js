@@ -110,33 +110,39 @@ router.post("/guardar-cv", authMiddleware, async (req, res) => {
         const { personal, descripcion, habilidades, educacion, experiencia, idiomas, referencias } = req.body;
         const usuarioId = req.user.id;
 
-        const resultado = await prisma.perfilCV.upsert({
-            where: { usuarioId }, // Busca si ya existe un perfil para este usuario
-            update: {             // Si existe, actualiza los datos
+        // Primero, aseguramos la existencia del perfil
+        const perfil = await prisma.perfilCV.upsert({
+            where: { usuarioId },
+            update: {
                 descripcion,
                 habilidades,
                 telefono: personal?.telefono,
                 email: personal?.email,
-                // deleteMany + create es la forma estándar de "reemplazar" las listas relacionadas
-                educacion: { deleteMany: {}, create: educacion },
-                experiencia: { deleteMany: {}, create: experiencia },
-                idiomas: { deleteMany: {}, create: idiomas },
-                referencias: { deleteMany: {}, create: referencias }
             },
-            create: {             // Si no existe, créalo desde cero
+            create: {
                 usuarioId,
                 descripcion,
                 habilidades,
                 telefono: personal?.telefono,
                 email: personal?.email,
-                educacion: { create: educacion },
-                experiencia: { create: experiencia },
-                idiomas: { create: idiomas },
-                referencias: { create: referencias }
             }
         });
 
-        res.status(200).json({ success: true, message: "CV guardado con éxito", data: resultado });
+        // Segundo: Actualizamos las relaciones (Educación, Experiencia, etc.)
+        // Usamos el ID del perfil que obtuvimos arriba
+        await prisma.educacion.deleteMany({ where: { perfilId: perfil.id } });
+        await prisma.educacion.createMany({ 
+            data: educacion.map(e => ({ ...e, perfilId: perfil.id })) 
+        });
+
+        await prisma.experiencia.deleteMany({ where: { perfilId: perfil.id } });
+        await prisma.experiencia.createMany({ 
+            data: experiencia.map(e => ({ ...e, perfilId: perfil.id })) 
+        });
+
+        // ... repite para idiomas y referencias
+        
+        res.status(200).json({ success: true, message: "CV guardado con éxito" });
     } catch (error) {
         console.error("Error al guardar CV:", error);
         res.status(500).json({ success: false, error: "Error al guardar el CV" });

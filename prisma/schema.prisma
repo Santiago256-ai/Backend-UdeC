@@ -34,6 +34,9 @@ model PerfilCV {
   usuarioId   Int    @unique
   usuario     Usuario @relation(fields: [usuarioId], references: [id])
 
+  telefono    String?
+  email       String?
+
   descripcion String?
   habilidades String?
 

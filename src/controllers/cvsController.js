@@ -4,14 +4,17 @@ const prisma = new PrismaClient();
 
 export const guardarCV = async (req, res) => {
   const usuarioId = req.user.id; 
-  const { descripcion, habilidades, educacion, experiencia, idiomas, referencias } = req.body;
+  const { personal, descripcion, habilidades, educacion, experiencia, idiomas, referencias } = req.body;
 
   try {
     const perfil = await prisma.perfilCV.upsert({
       where: { usuarioId: usuarioId },
       update: {
+        telefono: personal.telefono, // Agregado
+        email: personal.email,       // Agregado
         descripcion,
         habilidades,
+        // Limpiamos y recreamos las relaciones
         educacion: { deleteMany: {}, create: educacion },
         experiencia: { deleteMany: {}, create: experiencia },
         idiomas: { deleteMany: {}, create: idiomas },
@@ -19,6 +22,8 @@ export const guardarCV = async (req, res) => {
       },
       create: {
         usuarioId: usuarioId,
+        telefono: personal.telefono, // Agregado
+        email: personal.email,       // Agregado
         descripcion,
         habilidades,
         educacion: { create: educacion },
@@ -30,6 +35,6 @@ export const guardarCV = async (req, res) => {
     res.status(200).json({ message: "Hoja de vida guardada con éxito", data: perfil });
   } catch (error) {
     console.error("Error al guardar el CV:", error);
-    res.status(500).json({ error: "No se pudo guardar la información del CV" });
+    res.status(500).json({ error: "No se pudo guardar la información" });
   }
 };

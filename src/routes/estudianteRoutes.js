@@ -110,7 +110,7 @@ router.post("/guardar-cv", authMiddleware, async (req, res) => {
         const { personal, descripcion, habilidades, educacion, experiencia, idiomas, referencias } = req.body;
         const usuarioId = req.user.id;
 
-        // Primero, aseguramos la existencia del perfil
+        // 1. Upsert del perfil base
         const perfil = await prisma.perfilCV.upsert({
             where: { usuarioId },
             update: {
@@ -128,24 +128,30 @@ router.post("/guardar-cv", authMiddleware, async (req, res) => {
             }
         });
 
-        // Segundo: Actualizamos las relaciones (Educación, Experiencia, etc.)
-        // Usamos el ID del perfil que obtuvimos arriba
-        await prisma.educacion.deleteMany({ where: { perfilId: perfil.id } });
-        await prisma.educacion.createMany({ 
-            data: educacion.map(e => ({ ...e, perfilId: perfil.id })) 
-        });
+        // 2. Función auxiliar para actualizar listas de forma segura
+        const updateRelation = async (modelName, data, perfilId) => {
+            // Siempre borramos lo anterior para limpiar
+            await prisma[modelName].deleteMany({ where: { perfilId } });
+            
+            // Solo creamos si hay datos y es un array con contenido
+            if (Array.isArray(data) && data.length > 0) {
+                await prisma[modelName].createMany({
+                    data: data.map(item => ({ ...item, perfilId }))
+                });
+            }
+        };
 
-        await prisma.experiencia.deleteMany({ where: { perfilId: perfil.id } });
-        await prisma.experiencia.createMany({ 
-            data: experiencia.map(e => ({ ...e, perfilId: perfil.id })) 
-        });
+        // 3. Ejecutar actualizaciones de forma segura
+        await updateRelation('educacion', educacion, perfil.id);
+        await updateRelation('experiencia', experiencia, perfil.id);
+        await updateRelation('idioma', idiomas, perfil.id); // Ajusta 'idioma' al nombre de tu modelo
+        await updateRelation('referencia', referencias, perfil.id); // Ajusta 'referencia' al nombre de tu modelo
 
-        // ... repite para idiomas y referencias
-        
         res.status(200).json({ success: true, message: "CV guardado con éxito" });
+
     } catch (error) {
-        console.error("Error al guardar CV:", error);
-        res.status(500).json({ success: false, error: "Error al guardar el CV" });
+        console.error("Error detallado al guardar CV:", error);
+        res.status(500).json({ success: false, error: "Error al guardar el CV: " + error.message });
     }
 });
 

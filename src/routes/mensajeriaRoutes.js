@@ -61,4 +61,28 @@ router.get('/historial/:usuarioId/:empresaId', async (req, res) => {
     }
 });
 
+// --- 3. OBTENER LISTA DE CONVERSACIONES (Añade esto a tu archivo) ---
+router.get('/mis-conversaciones/:usuarioId', async (req, res) => {
+    const usuarioId = parseInt(req.params.usuarioId);
+
+    try {
+        // Aquí debes usar la lógica de Prisma para obtener las conversaciones del usuario
+        // Ejemplo simplificado (ajústalo a tu esquema de DB):
+        const conversaciones = await prisma.mensaje.findMany({
+            where: {
+                OR: [
+                    { senderUsuarioId: usuarioId },
+                    { receiverId: usuarioId }
+                ]
+            },
+            // ... lógica adicional para agrupar por empresa o vacante
+        });
+        
+        res.json(conversaciones);
+    } catch (error) {
+        console.error("Error al obtener conversaciones:", error);
+        res.status(500).json({ error: "Error al obtener la lista de conversaciones" });
+    }
+});
+
 export default router;

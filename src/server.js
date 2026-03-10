@@ -12,12 +12,12 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 // Importación de Rutas (Corregidas según tu estructura de carpetas)
-import authRoutes from "./routes/authRoutes.js"; 
-import vacantesRoutes from "./routes/vacantesRoutes.js";
-import postulacionesRoutes from "./routes/postulacionesRoutes.js";
-import empresaRoutes from "./routes/empresaRoutes.js";
-import estudianteRoutes from "./routes/estudianteRoutes.js";
-import mensajeriaRoutes from "./routes/mensajeriaRoutes.js"; //
+import authRoutes from "./src/routes/authRoutes.js"; 
+import vacantesRoutes from "./src/routes/vacantesRoutes.js";
+import postulacionesRoutes from "./src/routes/postulacionesRoutes.js";
+import empresaRoutes from "./src/routes/empresaRoutes.js";
+import estudianteRoutes from "./src/routes/estudianteRoutes.js";
+import mensajeriaRoutes from "./src/routes/mensajeriaRoutes.js"; //
 
 const app = express();
 

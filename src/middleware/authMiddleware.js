@@ -1,38 +1,24 @@
-// src/middleware/authMiddleware.js
-import prisma from "../prismaClient.js";
+import jwt from 'jsonwebtoken';
 
-export const authMiddleware = async (req, res, next) => {
+const JWT_SECRET = process.env.JWT_SECRET || 'mi_clave_secreta_debes_cambiarla';
+
+export const authMiddleware = (req, res, next) => {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(403).json({ message: "No autorizado: falta token" });
+    }
+
+    const token = authHeader.split(" ")[1];
+
     try {
-        const authHeader = req.headers.authorization;
-        console.log("Header recibido:", authHeader); // <--- ESTO ES VITAL
+        // Verifica el token usando la misma clave secreta
+        const decoded = jwt.verify(token, JWT_SECRET);
         
-        // 1. Validar que el header exista
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
-            return res.status(403).json({ message: "No autorizado: formato de token inválido" });
-        }
-
-        // 2. Extraer solo el token (el ID) eliminando "Bearer "
-        const token = authHeader.split(" ")[1]; 
-
-        // 3. Convertir a entero y buscar
-        const userId = parseInt(token);
-        
-        if (isNaN(userId)) {
-            return res.status(400).json({ message: "Token inválido" });
-        }
-
-        const usuario = await prisma.usuario.findUnique({
-            where: { id: userId }
-        });
-
-        if (!usuario) {
-            return res.status(401).json({ message: "Usuario no encontrado" });
-        }
-
-        req.user = usuario; 
+        // Inyectamos el ID del usuario para usarlo en los controladores
+        req.user = decoded; 
         next();
     } catch (error) {
-        console.error("Error en authMiddleware:", error);
-        return res.status(500).json({ message: "Error interno en la autenticación" });
+        return res.status(401).json({ message: "Token inválido o expirado" });
     }
 };

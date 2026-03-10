@@ -110,48 +110,42 @@ router.post("/guardar-cv", authMiddleware, async (req, res) => {
         const { personal, descripcion, habilidades, educacion, experiencia, idiomas, referencias } = req.body;
         const usuarioId = req.user.id;
 
-        // 1. Upsert del perfil base
+        // 1. Upsert del perfil base (esto funciona, lo mantenemos)
         const perfil = await prisma.perfilCV.upsert({
             where: { usuarioId },
-            update: {
-                descripcion,
-                habilidades,
-                telefono: personal?.telefono,
-                email: personal?.email,
-            },
-            create: {
-                usuarioId,
-                descripcion,
-                habilidades,
-                telefono: personal?.telefono,
-                email: personal?.email,
-            }
+            update: { descripcion, habilidades, telefono: personal?.telefono, email: personal?.email },
+            create: { usuarioId, descripcion, habilidades, telefono: personal?.telefono, email: personal?.email }
         });
 
-        // 2. Función auxiliar para actualizar listas de forma segura
-        const updateRelation = async (modelName, data, perfilId) => {
-            // Siempre borramos lo anterior para limpiar
-            await prisma[modelName].deleteMany({ where: { perfilId } });
+        // 2. Función SEGURA para guardar relaciones (¡Esto es lo que evita el error 500!)
+        const guardarRelacion = async (modelo, datos, perfilId) => {
+            // Borramos lo anterior
+            await prisma[modelo].deleteMany({ where: { perfilId } });
             
-            // Solo creamos si hay datos y es un array con contenido
-            if (Array.isArray(data) && data.length > 0) {
-                await prisma[modelName].createMany({
-                    data: data.map(item => ({ ...item, perfilId }))
-                });
+            // SOLO si existen datos y es un array, procedemos
+            if (Array.isArray(datos) && datos.length > 0) {
+                // Filtramos objetos que tengan datos reales para evitar errores de validación
+                const datosValidos = datos.filter(item => item.titulo || item.cargo || item.idioma || item.nombre);
+                
+                if (datosValidos.length > 0) {
+                    await prisma[modelo].createMany({
+                        data: datosValidos.map(item => ({ ...item, perfilId }))
+                    });
+                }
             }
         };
 
-        // 3. Ejecutar actualizaciones de forma segura
-        await updateRelation('educacion', educacion, perfil.id);
-        await updateRelation('experiencia', experiencia, perfil.id);
-        await updateRelation('idioma', idiomas, perfil.id); // Ajusta 'idioma' al nombre de tu modelo
-        await updateRelation('referencia', referencias, perfil.id); // Ajusta 'referencia' al nombre de tu modelo
-
+        // 3. Ejecutar de forma segura
+        await guardarRelacion('educacion', educacion, perfil.id);
+        await guardarRelacion('experiencia', experiencia, perfil.id);
+        await guardarRelacion('idioma', idiomas, perfil.id);
+        await guardarRelacion('referencia', referencias, perfil.id);
+        
         res.status(200).json({ success: true, message: "CV guardado con éxito" });
 
     } catch (error) {
-        console.error("Error detallado al guardar CV:", error);
-        res.status(500).json({ success: false, error: "Error al guardar el CV: " + error.message });
+        console.error("Error al guardar CV:", error);
+        res.status(500).json({ success: false, error: "Error interno al procesar el CV" });
     }
 });
 

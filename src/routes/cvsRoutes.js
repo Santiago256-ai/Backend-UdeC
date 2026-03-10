@@ -1,7 +1,7 @@
-// En tu archivo routes/cvsRoutes.js
 import express from "express";
 import { guardarCV } from "../controllers/cvsController.js"; 
-import authMiddleware from "../middleware/authMiddleware.js"; // ¡No olvides incluir tu middleware!
+// Sube un nivel (sale de routes), sube otro (sale de src) y entra a middleware
+import { authMiddleware } from "../../middleware/authMiddleware.js"; 
 
 const router = express.Router();
 router.post("/guardar", authMiddleware, guardarCV);

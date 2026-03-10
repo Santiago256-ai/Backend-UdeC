@@ -1,8 +1,20 @@
-node_modules
+# Dependencias
+node_modules/
+
+# Credenciales y variables de entorno
 .env
 .env.local
+*.json # CUIDADO: Esto ignoraría tu package.json, mejor sé específico:
+serviceAccountKey.json
 src/serviceAccountKey.json
-service-account-key.json
 
-# Aseguramos que NO se ignore la carpeta que necesita Vercel
-!src/generated/
+# Carpetas de caché y Vercel
+.vercel/
+.cache/
+dist/
+build/
+*.log
+
+# Si usas Prisma, no subas el cliente generado (se regenera en el despliegue)
+# Opcional, pero recomendado:
+prisma/generated/

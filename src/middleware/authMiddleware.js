@@ -1,16 +1,19 @@
-import { Router } from "express";
-import { authMiddleware } from "../middleware/authMiddleware.js";
-import { crearEstudiante, loginEstudiante } from "../controllers/estudianteController.js";
+import admin from "firebase-admin";
 
-const router = Router();
+export const authMiddleware = async (req, res, next) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            return res.status(401).json({ message: "No autorizado: Token faltante" });
+        }
 
-// Rutas públicas
-router.post("/registro", crearEstudiante);
-router.post("/login", loginEstudiante);
-
-// Ejemplo de ruta protegida (se necesita el authMiddleware para funcionar)
-router.get("/perfil", authMiddleware, (req, res) => {
-    res.json({ message: "Perfil del estudiante", user: req.user });
-});
-
-export default router;
+        const token = authHeader.split(" ")[1];
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        
+        req.user = decodedToken;
+        next();
+    } catch (error) {
+        console.error("Error en authMiddleware:", error);
+        return res.status(403).json({ message: "No autorizado: Token inválido" });
+    }
+};

@@ -106,26 +106,40 @@ router.post("/:vacanteId/upload", upload.single("cv"), async (req, res) => {
 
 // Añade esta ruta al final antes del export
 router.post("/guardar-cv", authMiddleware, async (req, res) => {
-    console.log("Datos recibidos en el backend:", JSON.stringify(req.body, null, 2));
     try {
         const { personal, descripcion, habilidades, educacion, experiencia, idiomas, referencias } = req.body;
-        const usuarioId = req.user.id; // Obtenido del token gracias al authMiddleware
+        const usuarioId = req.user.id;
 
-        // Aquí guardas todo en la base de datos usando Prisma
-        const nuevoCv = await prisma.cv.create({
-            data: {
+        const resultado = await prisma.perfilCV.upsert({
+            where: { usuarioId }, // Busca si ya existe un perfil para este usuario
+            update: {             // Si existe, actualiza los datos
+                descripcion,
+                habilidades,
+                telefono: personal?.telefono,
+                email: personal?.email,
+                // deleteMany + create es la forma estándar de "reemplazar" las listas relacionadas
+                educacion: { deleteMany: {}, create: educacion },
+                experiencia: { deleteMany: {}, create: experiencia },
+                idiomas: { deleteMany: {}, create: idiomas },
+                referencias: { deleteMany: {}, create: referencias }
+            },
+            create: {             // Si no existe, créalo desde cero
                 usuarioId,
                 descripcion,
                 habilidades,
-                // ... y aquí el resto de tus campos (educacion, experiencia, etc.)
-                // NOTA: Asegúrate de tener los modelos de Prisma configurados para estas relaciones
+                telefono: personal?.telefono,
+                email: personal?.email,
+                educacion: { create: educacion },
+                experiencia: { create: experiencia },
+                idiomas: { create: idiomas },
+                referencias: { create: referencias }
             }
         });
 
-        res.status(200).json({ success: true, message: "CV guardado con éxito", data: nuevoCv });
+        res.status(200).json({ success: true, message: "CV guardado con éxito", data: resultado });
     } catch (error) {
         console.error("Error al guardar CV:", error);
-        res.status(500).json({ success: false, error: "Error interno al guardar el CV" });
+        res.status(500).json({ success: false, error: "Error al guardar el CV" });
     }
 });
 

@@ -12,15 +12,14 @@ import { Buffer } from 'buffer';
 // ✅ BASE DE DATOS HABILITADA: Descomentamos la importación del pool
 import pool from "./database.js"; 
 
-import vacanteRoutes from "./routes/vacanteRoutes.js";
-import postulacionRoutes from "./routes/postulacionRoutes.js";
+import vacantesRoutes from "./routes/vacantesRoutes.js";
+import postulacionesRoutes from "./routes/postulacionesRoutes.js";
 import empresaRoutes from "./routes/empresaRoutes.js";
 import estudianteRoutes from "./routes/estudianteRoutes.js";
 import authRoutes from "./routes/authRoutes.js"; 
 
 // ⚡ NUEVA RUTA: Importamos la ruta de mensajería ⚡
-import mensajesRoutes from "./routes/mensajesRoutes.js"; 
-
+import mensajeriaRoutes from "./routes/mensajeriaRoutes.js"; // Usa mensajeriaRoutes.js que es el que tienes en tu carpeta
 const app = express();
 
 // ----------------- CONFIGURACIÓN FIREBASE ADMIN (FIXED & REUSABLE) -----------------
@@ -98,12 +97,12 @@ app.get("/users", async (req, res) => {
 
 // Rutas API
 app.use("/api/auth", authRoutes); 
-app.use("/api/vacantes", vacanteRoutes);
-app.use("/api/postulaciones", postulacionRoutes);
+app.use("/api/vacantes", vacantesRoutes);
+app.use("/api/postulaciones", postulacionesRoutes);
 app.use("/api/empresas", empresaRoutes);
 app.use("/api/estudiantes", estudianteRoutes);
 // ⚡ CONEXIÓN DE LA NUEVA RUTA DE MENSAJES ⚡
-app.use("/api/mensajeria", mensajesRoutes); 
+app.use("/api/mensajeria", mensajeriaRoutes);
 
 // ---------------------------------------------------------------
 // ----------------- TEST DE BASE DE DATOS E INICIALIZAR SERVIDOR -----------------

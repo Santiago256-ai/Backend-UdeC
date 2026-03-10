@@ -5,12 +5,20 @@ export const authMiddleware = async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
         
-        if (!authHeader) {
-            return res.status(401).json({ message: "No autorizado" });
+        // 1. Validar que el header exista
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            return res.status(403).json({ message: "No autorizado: formato de token inválido" });
         }
 
-        // El token ahora es el ID que guardamos en localStorage
-        const userId = parseInt(authHeader); 
+        // 2. Extraer solo el token (el ID) eliminando "Bearer "
+        const token = authHeader.split(" ")[1]; 
+
+        // 3. Convertir a entero y buscar
+        const userId = parseInt(token);
+        
+        if (isNaN(userId)) {
+            return res.status(400).json({ message: "Token inválido" });
+        }
 
         const usuario = await prisma.usuario.findUnique({
             where: { id: userId }
@@ -20,11 +28,10 @@ export const authMiddleware = async (req, res, next) => {
             return res.status(401).json({ message: "Usuario no encontrado" });
         }
 
-        // Inyectamos el usuario para que la ruta lo use
         req.user = usuario; 
-        
         next();
     } catch (error) {
-        return res.status(403).json({ message: "Error en la validación" });
+        console.error("Error en authMiddleware:", error);
+        return res.status(500).json({ message: "Error interno en la autenticación" });
     }
 };

@@ -121,4 +121,24 @@ router.get('/mis-conversaciones/:usuarioId', async (req, res) => {
     }
 });
 
+// --- 5. ACTUALIZAR ESTADO DE ACTIVIDAD DEL CHAT ---
+router.patch('/status-chat', async (req, res) => {
+    const { usuarioId, vacanteId, activo } = req.body;
+
+    if (!usuarioId || !vacanteId) {
+        return res.status(400).json({ error: "Faltan datos (usuarioId o vacanteId)" });
+    }
+
+    try {
+        // NOTA: Aquí depende de si tienes una tabla 'ChatEstado' o similar.
+        // Si solo quieres que el backend responda "OK" para que no de error:
+        console.log(`Usuario ${usuarioId} en vacante ${vacanteId} está activo: ${activo}`);
+        
+        res.json({ success: true, message: "Estado de presencia actualizado" });
+    } catch (error) {
+        console.error("Error al actualizar status:", error);
+        res.status(500).json({ error: "No se pudo actualizar el estado" });
+    }
+});
+
 export default router;

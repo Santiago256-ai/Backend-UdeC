@@ -3,6 +3,7 @@ import multer from "multer";
 import { createClient } from '@supabase/supabase-js'; 
 import prisma from "../prismaClient.js"; 
 import { crearEstudiante, loginEstudiante } from "../controllers/estudianteController.js"; 
+import { authMiddleware } from "../middleware/authMiddleware.js";
 
 const router = Router();
 
@@ -100,6 +101,31 @@ router.post("/:vacanteId/upload", upload.single("cv"), async (req, res) => {
             error: "Error interno al procesar el CV",
             details: error.message 
         });
+    }
+});
+
+// Añade esta ruta al final antes del export
+router.post("/guardar-cv", authMiddleware, async (req, res) => {
+    console.log("Datos recibidos en el backend:", JSON.stringify(req.body, null, 2));
+    try {
+        const { personal, descripcion, habilidades, educacion, experiencia, idiomas, referencias } = req.body;
+        const usuarioId = req.user.id; // Obtenido del token gracias al authMiddleware
+
+        // Aquí guardas todo en la base de datos usando Prisma
+        const nuevoCv = await prisma.cv.create({
+            data: {
+                usuarioId,
+                descripcion,
+                habilidades,
+                // ... y aquí el resto de tus campos (educacion, experiencia, etc.)
+                // NOTA: Asegúrate de tener los modelos de Prisma configurados para estas relaciones
+            }
+        });
+
+        res.status(200).json({ success: true, message: "CV guardado con éxito", data: nuevoCv });
+    } catch (error) {
+        console.error("Error al guardar CV:", error);
+        res.status(500).json({ success: false, error: "Error interno al guardar el CV" });
     }
 });
 

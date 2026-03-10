@@ -15,7 +15,7 @@ const prisma = new PrismaClient();
 
 // 2. CONFIGURACIÓN DE CORS MÁS SEGURA
 app.use(cors({
-    origin: ["http://localhost:5173", "https://tu-frontend-vercel.app"], // Añade tu URL de producción
+    origin: ["http://localhost:5173", "https://frontend-ude-c.vercel.app"], // Añade tu URL de producción
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true
 }));

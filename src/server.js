@@ -46,12 +46,12 @@ try {
 // ----------------- CONFIGURACIÓN CORS -----------------
 const corsOptions = {
     origin: ['https://frontend-ude-c.vercel.app', 'http://localhost:3000', 'http://localhost:5173'],
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     credentials: true,
     optionsSuccessStatus: 204
 };
 app.use(cors(corsOptions));
-
+app.options('*', cors(corsOptions));
 // ----------------- MIDDLEWARES -----------------
 app.use(express.json());
 app.use("/uploads", express.static(path.join(path.resolve(), "src", "uploads")));
@@ -95,12 +95,6 @@ async function checkDatabaseConnection() {
     }
 }
 
-// Ejecutar prueba e iniciar servidor
-checkDatabaseConnection().then(() => {
-    app.listen(PORT, () => {
-        console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
-    });
-});
 
 // ✅ OBLIGATORIO PARA VERCEL:
 export default app;

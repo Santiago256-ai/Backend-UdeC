@@ -4,6 +4,7 @@ import prisma from "../prismaClient.js";
 export const authMiddleware = async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
+        console.log("Header recibido:", authHeader); // <--- ESTO ES VITAL
         
         // 1. Validar que el header exista
         if (!authHeader || !authHeader.startsWith("Bearer ")) {

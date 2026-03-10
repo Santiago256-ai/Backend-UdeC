@@ -3,7 +3,7 @@ import multer from "multer";
 import { createClient } from '@supabase/supabase-js'; 
 import prisma from "../prismaClient.js"; 
 import { crearEstudiante, loginEstudiante } from "../controllers/estudianteController.js"; 
-import { authMiddleware } from "../middleware/authMiddleware.js";
+import { authMiddleware } from "./../middleware/authMiddleware.js";
 
 const router = Router();
 

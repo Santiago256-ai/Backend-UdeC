@@ -118,22 +118,22 @@ router.post("/guardar-cv", authMiddleware, async (req, res) => {
         });
 
         // 2. Función SEGURA para guardar relaciones (¡Esto es lo que evita el error 500!)
-        const guardarRelacion = async (modelo, datos, perfilId) => {
-            // Borramos lo anterior
-            await prisma[modelo].deleteMany({ where: { perfilId } });
-            
-            // SOLO si existen datos y es un array, procedemos
-            if (Array.isArray(datos) && datos.length > 0) {
-                // Filtramos objetos que tengan datos reales para evitar errores de validación
-                const datosValidos = datos.filter(item => item.titulo || item.cargo || item.idioma || item.nombre);
-                
-                if (datosValidos.length > 0) {
-                    await prisma[modelo].createMany({
-                        data: datosValidos.map(item => ({ ...item, perfilId }))
-                    });
-                }
-            }
-        };
+      // ... dentro de tu ruta /guardar-cv
+const guardarRelacion = async (modelo, datos, perfilId) => {
+    await prisma[modelo].deleteMany({ where: { perfilId } });
+    
+    if (Array.isArray(datos) && datos.length > 0) {
+        // Limpiamos los datos: eliminamos el 'id' generado en el frontend
+        const datosLimpios = datos.map(({ id, ...resto }) => ({
+            ...resto,
+            perfilId
+        }));
+
+        await prisma[modelo].createMany({
+            data: datosLimpios
+        });
+    }
+};
 
         // 3. Ejecutar de forma segura
         await guardarRelacion('educacion', educacion, perfil.id);

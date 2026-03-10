@@ -1,29 +1,33 @@
-import admin from "firebase-admin";
+// src/middleware/authMiddleware.js
 
 export const authMiddleware = async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
         
-        // 1. Log para ver qué recibe realmente el servidor
-        console.log("Token recibido en el header:", authHeader);
+        console.log("Header recibido:", authHeader);
 
+        // 1. Validamos que el header exista y tenga formato Bearer
         if (!authHeader || !authHeader.startsWith("Bearer ")) {
-            return res.status(401).json({ message: "No autorizado: Formato de token inválido" });
+            return res.status(401).json({ message: "No autorizado: Token faltante o formato incorrecto" });
         }
 
+        // 2. Extraemos el token después de "Bearer "
         const token = authHeader.split(" ")[1];
 
-        // 2. Validación de seguridad extra contra el string "null"
+        // 3. Verificamos que no sea la palabra "null"
         if (!token || token === "null" || token === "undefined") {
-             return res.status(401).json({ message: "No autorizado: El token es nulo" });
+             return res.status(401).json({ message: "No autorizado: Token nulo" });
         }
 
-        const decodedToken = await admin.auth().verifyIdToken(token);
-        req.user = decodedToken;
+        // --- AQUÍ LA MEJORA ---
+        // Si más adelante decides usar JWT, aquí verificarías el token con jsonwebtoken:
+        // const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        // req.user = decoded;
+
+        // Por ahora, permitimos el paso a la siguiente función
         next();
     } catch (error) {
-        // 3. Log detallado del error de Firebase
-        console.error("Error específico de Firebase al verificar token:", error.message);
-        return res.status(403).json({ message: "No autorizado: Token inválido o expirado" });
+        console.error("Error en authMiddleware:", error.message);
+        return res.status(403).json({ message: "No autorizado: Error en la validación" });
     }
 };

@@ -1,7 +1,6 @@
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../prismaClient.js';
 
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'clave_secreta_universidad_cundinamarca_2024';
 
 export const authMiddleware = async (req, res, next) => {

@@ -1,6 +1,7 @@
-const express = require('express');
+import express from 'express';
+import { PrismaClient } from '@prisma/client';
+
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 // --- 1. ENVIAR MENSAJE ---
@@ -13,15 +14,9 @@ router.post('/enviar', async (req, res) => {
                 contenido,
                 senderType, 
                 receiverId: parseInt(receiverId),
-                // Si envía la empresa, guardamos su ID en senderEmpresaId
                 senderEmpresaId: senderType === 'EMPRESA' ? parseInt(senderId) : null,
-                // Si envía el usuario, guardamos su ID en senderUsuarioId
                 senderUsuarioId: senderType === 'USUARIO' ? parseInt(senderId) : null,
                 
-                // NOTA: Para el historial, si el usuario envía, 
-                // deberías saber a qué empresa va. 
-                // Si tu esquema no tiene receiverEmpresaId, asegúrate de manejarlo.
-
                 ...(senderType === 'EMPRESA' && {
                     notificacion: {
                         create: {
@@ -40,7 +35,7 @@ router.post('/enviar', async (req, res) => {
     }
 });
 
-// --- 2. OBTENER HISTORIAL (Corregido para ser específico) ---
+// --- 2. OBTENER HISTORIAL ---
 router.get('/historial/:usuarioId/:empresaId', async (req, res) => {
     const uId = parseInt(req.params.usuarioId);
     const eId = parseInt(req.params.empresaId);
@@ -49,10 +44,7 @@ router.get('/historial/:usuarioId/:empresaId', async (req, res) => {
         const mensajes = await prisma.mensaje.findMany({
             where: {
                 OR: [
-                    // Mensajes enviados por la empresa al usuario
                     { senderEmpresaId: eId, receiverId: uId },
-                    // Mensajes enviados por el usuario a esta empresa
-                    // Ajustamos esto para que coincida con tu lógica de guardado
                     { senderUsuarioId: uId, senderType: 'USUARIO' } 
                 ]
             },
@@ -60,7 +52,6 @@ router.get('/historial/:usuarioId/:empresaId', async (req, res) => {
         });
         res.json(mensajes);
     } catch (error) {
-        console.error("Error en GET /historial:", error);
         res.status(500).json({ error: "Error al cargar historial" });
     }
 });
@@ -79,4 +70,4 @@ router.get('/contadores/:usuarioId', async (req, res) => {
     }
 });
 
-module.exports = router;
+export default router; // IMPORTANTE: Usar export default para ES Modules

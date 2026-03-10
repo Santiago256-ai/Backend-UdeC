@@ -1,9 +1,11 @@
 import express from "express";
 import { guardarCV } from "../controllers/cvsController.js"; 
-// Sube un nivel (sale de routes), sube otro (sale de src) y entra a middleware
-import { authMiddleware } from "../../middleware/authMiddleware.js"; 
+// Usamos { } porque en el middleware usamos 'export const'
+import { authMiddleware } from "../../middleware/authMiddleware.js";
 
 const router = express.Router();
+
+// La ruta queda protegida
 router.post("/guardar", authMiddleware, guardarCV);
 
 export default router;

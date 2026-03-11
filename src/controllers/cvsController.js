@@ -3,38 +3,44 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 export const guardarCV = async (req, res) => {
-  const usuarioId = req.user.id; 
-  const { personal, descripcion, habilidades, educacion, experiencia, idiomas, referencias } = req.body;
-
   try {
+    const usuarioId = req.user.id; 
+    const { personal, descripcion, habilidades, educacion, experiencia, idiomas, referencias } = req.body;
+
+    // Función para quitar el ID temporal del frontend y dejar que la DB genere el suyo
+    const prepararParaPrisma = (lista) => 
+      lista.map(({ id, ...resto }) => resto);
+
     const perfil = await prisma.perfilCV.upsert({
       where: { usuarioId: usuarioId },
       update: {
-        telefono: personal.telefono, // Agregado
-        email: personal.email,       // Agregado
+        telefono: personal.telefono,
+        email: personal.email,
         descripcion,
         habilidades,
-        // Limpiamos y recreamos las relaciones
-        educacion: { deleteMany: {}, create: educacion },
-        experiencia: { deleteMany: {}, create: experiencia },
-        idiomas: { deleteMany: {}, create: idiomas },
-        referencias: { deleteMany: {}, create: referencias },
+        // Eliminamos lo viejo y creamos lo nuevo sin los IDs del frontend
+        educacion: { deleteMany: {}, create: prepararParaPrisma(educacion) },
+        experiencia: { deleteMany: {}, create: prepararParaPrisma(experiencia) },
+        idiomas: { deleteMany: {}, create: prepararParaPrisma(idiomas) },
+        referencias: { deleteMany: {}, create: prepararParaPrisma(referencias) },
       },
       create: {
         usuarioId: usuarioId,
-        telefono: personal.telefono, // Agregado
-        email: personal.email,       // Agregado
+        telefono: personal.telefono,
+        email: personal.email,
         descripcion,
         habilidades,
-        educacion: { create: educacion },
-        experiencia: { create: experiencia },
-        idiomas: { create: idiomas },
-        referencias: { create: referencias },
+        educacion: { create: prepararParaPrisma(educacion) },
+        experiencia: { create: prepararParaPrisma(experiencia) },
+        idiomas: { create: prepararParaPrisma(idiomas) },
+        referencias: { create: prepararParaPrisma(referencias) },
       },
     });
+
     res.status(200).json({ message: "Hoja de vida guardada con éxito", data: perfil });
   } catch (error) {
     console.error("Error al guardar el CV:", error);
-    res.status(500).json({ error: "No se pudo guardar la información" });
+    // Enviamos el mensaje real del error para depurar en el frontend si es necesario
+    res.status(500).json({ error: error.message || "No se pudo guardar la información" });
   }
 };

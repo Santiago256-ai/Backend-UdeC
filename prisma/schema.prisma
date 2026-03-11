@@ -36,6 +36,7 @@ model PerfilCV {
 
   telefono    String?
   email       String?
+  direccion   String?
 
   descripcion String?
   habilidades String?

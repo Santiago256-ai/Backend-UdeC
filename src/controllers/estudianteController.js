@@ -83,14 +83,20 @@ export const guardarCV = async (req, res) => {
     const usuarioId = req.user.id; 
     const { personal, descripcion, habilidades, educacion, experiencia, idiomas, referencias } = req.body;
 
+    // Función mejorada para limpiar IDs temporales y filtrar nulos
     const prepararParaPrisma = (lista) => 
-      Array.isArray(lista) ? lista.map(({ id, perfilId, ...resto }) => resto) : [];
+      Array.isArray(lista) 
+        ? lista
+            .filter(item => item && typeof item === 'object' && Object.keys(item).length > 0)
+            .map(({ id, perfilId, ...resto }) => resto) 
+        : [];
 
     const perfil = await prisma.perfilCV.upsert({
       where: { usuarioId: usuarioId },
       update: {
-        telefono: personal.telefono,
-        email: personal.email,
+        telefono: personal?.telefono,
+        email: personal?.email,
+        direccion: personal?.direccion, // <--- AHORA SÍ SE GUARDARÁ
         descripcion,
         habilidades,
         educacion: { deleteMany: {}, create: prepararParaPrisma(educacion) },
@@ -100,8 +106,9 @@ export const guardarCV = async (req, res) => {
       },
       create: {
         usuarioId: usuarioId,
-        telefono: personal.telefono,
-        email: personal.email,
+        telefono: personal?.telefono,
+        email: personal?.email,
+        direccion: personal?.direccion, // <--- AHORA SÍ SE GUARDARÁ
         descripcion,
         habilidades,
         educacion: { create: prepararParaPrisma(educacion) },
@@ -113,8 +120,8 @@ export const guardarCV = async (req, res) => {
 
     res.status(200).json({ message: "Hoja de vida guardada con éxito", data: perfil });
   } catch (error) {
-    console.error("Error al guardar CV:", error);
-    res.status(500).json({ error: "No se pudo guardar la información" });
+    console.error("Error detallado:", error);
+    res.status(500).json({ error: "No se pudo guardar", detalle: error.message });
   }
 };
 

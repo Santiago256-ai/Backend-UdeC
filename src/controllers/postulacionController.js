@@ -102,7 +102,7 @@ export const crearPostulacion = async (req, res) => {
   }
 };
 
-// ✅ OBTENER POSTULACIONES POR ID DE VACANTE
+// ✅ OBTENER POSTULACIONES POR ID DE VACANTE (ACTUALIZADO CON PERFIL COMPLETO)
 export const obtenerPostulacionesPorVacante = async (req, res) => {
     try {
         const vacanteId = parseInt(req.params.vacanteId);
@@ -112,11 +112,16 @@ export const obtenerPostulacionesPorVacante = async (req, res) => {
             where: { vacanteId },
             include: { 
                 usuario: {
-                    select: {
-                        id: true,
-                        nombres: true, 
-                        apellidos: true, 
-                        correo: true,
+                    include: {
+                        // Traemos el PerfilCV y todas sus tablas relacionadas
+                        cv: {
+                            include: {
+                                educacion: true,
+                                experiencia: true,
+                                idiomas: true,
+                                referencias: true
+                            }
+                        }
                     }
                 } 
             },
@@ -125,6 +130,7 @@ export const obtenerPostulacionesPorVacante = async (req, res) => {
     
         res.json(postulaciones);
     } catch (error) {
+        console.error("Error al obtener postulaciones con perfil:", error);
         res.status(500).json({ error: "Error interno del servidor." });
     }
 }

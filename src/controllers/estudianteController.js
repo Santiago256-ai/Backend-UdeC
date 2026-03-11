@@ -84,12 +84,19 @@ export const guardarCV = async (req, res) => {
     const { personal, descripcion, habilidades, educacion, experiencia, idiomas, referencias } = req.body;
 
     // Función mejorada para limpiar IDs temporales y filtrar nulos
-    const prepararParaPrisma = (lista) => 
-      Array.isArray(lista) 
-        ? lista
-            .filter(item => item && typeof item === 'object' && Object.keys(item).length > 0)
-            .map(({ id, perfilId, ...resto }) => resto) 
-        : [];
+   const prepararParaPrisma = (lista) => {
+  if (!Array.isArray(lista)) return [];
+  
+  return lista
+    .filter(item => 
+      item && 
+      typeof item === 'object' && 
+      Object.keys(item).length > 0 && 
+      // Evita que entren objetos que solo tienen el ID temporal del frontend
+      (item.institucion || item.empresa || item.idioma || item.nombre) 
+    )
+    .map(({ id, perfilId, ...resto }) => resto);
+};
 
     const perfil = await prisma.perfilCV.upsert({
       where: { usuarioId: usuarioId },

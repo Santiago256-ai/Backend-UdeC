@@ -1,40 +1,30 @@
 import { Router } from "express";
-import multer from "multer";
-import { createClient } from '@supabase/supabase-js'; 
 import prisma from "../prismaClient.js"; 
-import { crearEstudiante, loginEstudiante } from "../controllers/estudianteController.js"; 
+import { 
+    crearEstudiante, 
+    loginEstudiante, 
+    guardarCV, 
+    obtenerMiCV 
+} from "../controllers/estudianteController.js"; 
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
 const router = Router();
 
-// 1. Inicialización de Supabase con variables de entorno de Vercel
-const supabase = createClient(
-    process.env.SUPABASE_URL, 
-    process.env.SUPABASE_ANON_KEY
-);
-
-// 2. Configuración de Multer: USAR MEMORIA (Crucial para Vercel)
-// Esto evita el error EROFS al no intentar escribir en el disco del servidor
-const storage = multer.memoryStorage(); 
-
-const upload = multer({ 
-    storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // Máximo 5MB
-    fileFilter: (req, file, cb) => {
-        if (file.mimetype === "application/pdf") {
-            cb(null, true);
-        } else {
-            cb(new Error("Solo se permiten archivos PDF"), false);
-        }
-    }
-});
-
-// RUTAS EXISTENTES
+// --- RUTAS DE AUTENTICACIÓN ---
 router.post("/registro", crearEstudiante);
 router.post("/login", loginEstudiante); 
 
-// Obtener postulaciones por usuario
-router.get("/usuario/:usuarioId", async (req, res) => {
+// --- RUTAS DE LA HOJA DE VIDA DIGITAL ---
+// Obtener los datos para cargar el formulario (useEffect)
+router.get("/mi-cv", authMiddleware, obtenerMiCV);
+
+// Guardar los datos del formulario (botón GUARDAR)
+router.post("/guardar-cv", authMiddleware, guardarCV);
+
+// --- RUTAS DE POSTULACIÓN ---
+
+// 1. Ver mis postulaciones
+router.get("/usuario/:usuarioId", authMiddleware, async (req, res) => {
     try {
         const usuarioId = parseInt(req.params.usuarioId);
         const postulaciones = await prisma.postulacion.findMany({
@@ -43,109 +33,37 @@ router.get("/usuario/:usuarioId", async (req, res) => {
         });
         res.json(postulaciones);
     } catch (error) {
-        console.error("Error en GET postulaciones:", error);
         res.status(500).json({ error: "Error al obtener postulaciones" });
     }
 });
 
-// 3. RUTA DE CARGA DE CV (CORREGIDA PARA LA NUBE)
-router.post("/:vacanteId/upload", upload.single("cv"), async (req, res) => {
+// 2. Postularse a una vacante (¡SIN PDF!)
+// Ahora el estudiante solo da clic en "Postularse" y usamos su perfil digital
+router.post("/:vacanteId/postular", authMiddleware, async (req, res) => {
     try {
-        const { usuarioId, telefono } = req.body;
+        const { telefono } = req.body;
         const vacanteId = parseInt(req.params.vacanteId);
+        const usuarioId = req.user.id; // Obtenido del token
 
-        if (!req.file) {
-            return res.status(400).json({ error: "Debe subir un archivo PDF" });
+        // Verificamos si ya existe el perfil digital
+        const perfil = await prisma.perfilCV.findUnique({ where: { usuarioId } });
+        if (!perfil) {
+            return res.status(400).json({ error: "Primero debes crear tu hoja de vida digital" });
         }
 
-        // Crear un nombre único para el archivo en la nube
-        const fileName = `${Date.now()}_${req.file.originalname.replace(/\s+/g, '_')}`;
-
-        // SUBIDA A SUPABASE STORAGE
-        const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('hojas_de_vida') // Nombre del bucket que creaste
-            .upload(fileName, req.file.buffer, {
-                contentType: 'application/pdf',
-                upsert: false
-            });
-
-        if (uploadError) {
-            console.error("Error subiendo a Supabase:", uploadError);
-            throw uploadError;
-        }
-
-        // OBTENER LA URL PÚBLICA (Gracias a tu política SELECT)
-        const { data: { publicUrl } } = supabase.storage
-            .from('hojas_de_vida')
-            .getPublicUrl(fileName);
-
-        // GUARDAR EN POSTGRESQL (A través de Prisma)
         const postulacion = await prisma.postulacion.create({
             data: {
                 vacanteId,
-                usuarioId: parseInt(usuarioId),
-                telefono,
-                cv_url: publicUrl, // Guardamos el link de la nube, no una ruta local
+                usuarioId,
+                telefono: telefono || perfil.telefono, // Usa el del form o el del perfil
+                estado: "PENDIENTE"
             },
         });
 
-        res.json({ 
-            message: "¡Postulación exitosa!", 
-            postulacion,
-            fileUrl: publicUrl 
-        });
-
+        res.json({ message: "¡Postulación exitosa!", postulacion });
     } catch (error) {
-        console.error("Error detallado en la carga:", error);
-        res.status(500).json({ 
-            error: "Error interno al procesar el CV",
-            details: error.message 
-        });
-    }
-});
-
-// Añade esta ruta al final antes del export
-router.post("/guardar-cv", authMiddleware, async (req, res) => {
-    try {
-        const { personal, descripcion, habilidades, educacion, experiencia, idiomas, referencias } = req.body;
-        const usuarioId = req.user.id;
-
-        // 1. Upsert del perfil base (esto funciona, lo mantenemos)
-        const perfil = await prisma.perfilCV.upsert({
-            where: { usuarioId },
-            update: { descripcion, habilidades, telefono: personal?.telefono, email: personal?.email },
-            create: { usuarioId, descripcion, habilidades, telefono: personal?.telefono, email: personal?.email }
-        });
-
-        // 2. Función SEGURA para guardar relaciones (¡Esto es lo que evita el error 500!)
-      // ... dentro de tu ruta /guardar-cv
-const guardarRelacion = async (modelo, datos, perfilId) => {
-    await prisma[modelo].deleteMany({ where: { perfilId } });
-    
-    if (Array.isArray(datos) && datos.length > 0) {
-        // Limpiamos los datos: eliminamos el 'id' generado en el frontend
-        const datosLimpios = datos.map(({ id, ...resto }) => ({
-            ...resto,
-            perfilId
-        }));
-
-        await prisma[modelo].createMany({
-            data: datosLimpios
-        });
-    }
-};
-
-        // 3. Ejecutar de forma segura
-        await guardarRelacion('educacion', educacion, perfil.id);
-        await guardarRelacion('experiencia', experiencia, perfil.id);
-        await guardarRelacion('idioma', idiomas, perfil.id);
-        await guardarRelacion('referencia', referencias, perfil.id);
-        
-        res.status(200).json({ success: true, message: "CV guardado con éxito" });
-
-    } catch (error) {
-        console.error("Error al guardar CV:", error);
-        res.status(500).json({ success: false, error: "Error interno al procesar el CV" });
+        console.error(error);
+        res.status(500).json({ error: "Error al procesar la postulación" });
     }
 });
 

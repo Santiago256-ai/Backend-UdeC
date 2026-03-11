@@ -134,7 +134,6 @@ model Vacante {
 model Postulacion {
   id         Int      @id @default(autoincrement())
   telefono   String?
-  cv_url     String?
   estado     String   @default("PENDIENTE")
   chatActivo Boolean  @default(true)
   fecha      DateTime @default(now())

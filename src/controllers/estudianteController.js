@@ -78,44 +78,55 @@ export const loginEstudiante = async (req, res) => {
 // ==========================================
 // GUARDAR / ACTUALIZAR CV (Hoja de Vida Digital)
 // ==========================================
+// ==========================================
+// GUARDAR / ACTUALIZAR CV (Hoja de Vida Digital)
+// ==========================================
 export const guardarCV = async (req, res) => {
   try {
-    const usuarioId = req.user.id; 
+    // ✅ CORRECCIÓN CRÍTICA: Forzamos el ID a número entero
+    const usuarioId = parseInt(req.user.id);
+
+    // Validación de seguridad para el ID
+    if (isNaN(usuarioId)) {
+      return res.status(400).json({ error: "El ID de usuario no es válido o no se recibió correctamente." });
+    }
+
     const { personal, descripcion, habilidades, educacion, experiencia, idiomas, referencias } = req.body;
 
-    // Función mejorada para limpiar IDs temporales y filtrar nulos
-   const prepararParaPrisma = (lista) => {
-  if (!Array.isArray(lista)) return [];
-  
-  return lista
-    .filter(item => 
-      item && 
-      typeof item === 'object' && 
-      Object.keys(item).length > 0 && 
-      // Evita que entren objetos que solo tienen el ID temporal del frontend
-      (item.institucion || item.empresa || item.idioma || item.nombre) 
-    )
-    .map(({ id, perfilId, ...resto }) => resto);
-};
+    // Función para limpiar IDs temporales y filtrar nulos
+    const prepararParaPrisma = (lista) => {
+      if (!Array.isArray(lista)) return [];
+      
+      return lista
+        .filter(item => 
+          item && 
+          typeof item === 'object' && 
+          Object.keys(item).length > 0 && 
+          (item.institucion || item.empresa || item.idioma || item.nombre) 
+        )
+        .map(({ id, perfilId, ...resto }) => resto);
+    };
 
+    // Ejecución del upsert con el ID corregido
     const perfil = await prisma.perfilCV.upsert({
       where: { usuarioId: usuarioId },
       update: {
         telefono: personal?.telefono,
         email: personal?.email,
-        direccion: personal?.direccion, // <--- AHORA SÍ SE GUARDARÁ
+        direccion: personal?.direccion,
         descripcion,
         habilidades,
+        // Limpiamos y recreamos las relaciones para evitar duplicados o IDs huérfanos
         educacion: { deleteMany: {}, create: prepararParaPrisma(educacion) },
         experiencia: { deleteMany: {}, create: prepararParaPrisma(experiencia) },
         idiomas: { deleteMany: {}, create: prepararParaPrisma(idiomas) },
         referencias: { deleteMany: {}, create: prepararParaPrisma(referencias) },
       },
       create: {
-        usuarioId: usuarioId,
+        usuarioId: usuarioId, // ✅ ID como número
         telefono: personal?.telefono,
         email: personal?.email,
-        direccion: personal?.direccion, // <--- AHORA SÍ SE GUARDARÁ
+        direccion: personal?.direccion,
         descripcion,
         habilidades,
         educacion: { create: prepararParaPrisma(educacion) },
@@ -126,9 +137,22 @@ export const guardarCV = async (req, res) => {
     });
 
     res.status(200).json({ message: "Hoja de vida guardada con éxito", data: perfil });
+    
   } catch (error) {
-    console.error("Error detallado:", error);
-    res.status(500).json({ error: "No se pudo guardar", detalle: error.message });
+    console.error("Error detallado en guardarCV:", error);
+
+    // Manejo específico del error de Llave Foránea de Prisma
+    if (error.code === 'P2003') {
+      return res.status(404).json({ 
+        error: "No se pudo guardar", 
+        detalle: "El usuario no existe en la base de datos. Por favor, vuelve a iniciar sesión." 
+      });
+    }
+
+    res.status(500).json({ 
+      error: "No se pudo guardar la información", 
+      detalle: error.message 
+    });
   }
 };
 

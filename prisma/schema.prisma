@@ -143,6 +143,8 @@ model Postulacion {
   usuarioId  Int
   vacante    Vacante  @relation(fields: [vacanteId], references: [id])
   usuario    Usuario  @relation(fields: [usuarioId], references: [id])
+
+  @@unique([vacanteId, usuarioId]) 
 }
 
 // =========================================================

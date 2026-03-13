@@ -37,15 +37,19 @@ router.get("/usuario/:usuarioId", authMiddleware, async (req, res) => {
     }
 });
 
-// 2. Postularse a una vacante (¡SIN PDF!)
-// Ahora el estudiante solo da clic en "Postularse" y usamos su perfil digital
+// 2. Postularse a una vacante
 router.post("/:vacanteId/postular", authMiddleware, async (req, res) => {
     try {
         const { telefono } = req.body;
         const vacanteId = parseInt(req.params.vacanteId);
-        const usuarioId = req.user.id; // Obtenido del token
+        
+        // FORZAMOS QUE SEA NÚMERO (si tu DB usa IDs numéricos)
+        const usuarioId = parseInt(req.user.id); 
 
-        // Verificamos si ya existe el perfil digital
+        if (isNaN(vacanteId) || isNaN(usuarioId)) {
+            return res.status(400).json({ error: "ID de vacante o usuario inválido" });
+        }
+
         const perfil = await prisma.perfilCV.findUnique({ where: { usuarioId } });
         if (!perfil) {
             return res.status(400).json({ error: "Primero debes crear tu hoja de vida digital" });
@@ -53,17 +57,17 @@ router.post("/:vacanteId/postular", authMiddleware, async (req, res) => {
 
         const postulacion = await prisma.postulacion.create({
             data: {
-                vacanteId,
-                usuarioId,
-                telefono: telefono || perfil.telefono, // Usa el del form o el del perfil
+                vacanteId: vacanteId,
+                usuarioId: usuarioId, // VERIFICA EN TU SCHEMA SI ES 'usuarioId' o 'estudianteId'
+                telefono: telefono || perfil.telefono || "Sin teléfono",
                 estado: "PENDIENTE"
             },
         });
 
         res.json({ message: "¡Postulación exitosa!", postulacion });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Error al procesar la postulación" });
+        console.error("ERROR EN POSTULACIÓN:", error); // Esto te dará el detalle exacto en la consola de Vercel
+        res.status(500).json({ error: "Error al procesar la postulación", detalle: error.message });
     }
 });
 

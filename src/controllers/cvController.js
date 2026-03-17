@@ -6,83 +6,97 @@ export const upsertCV = async (req, res) => {
         const usuarioId = parseInt(req.params.usuarioId);
         const data = req.body;
 
-        // Limpieza de datos: Filtramos los objetos vacíos antes de enviarlos a Prisma
-        const expLimpia = (data.experiencia || []).filter(e => e.cargo && e.cargo.trim() !== "");
-        const eduLimpia = (data.educacion || []).filter(e => e.titulo && e.titulo.trim() !== "");
-        const refLimpia = (data.referencias || []).filter(r => r.nombre && r.nombre.trim() !== "");
-        const aptLimpia = (data.aptitudes || []).filter(a => a.aptitud && a.aptitud.trim() !== "");
-        // Convertimos el nivel a número entero para que coincida con el schema
-        const idiLimpia = (data.idiomas || []).filter(i => i.idioma && i.idioma.trim() !== "").map(i => ({
-            idioma: i.idioma,
-            nivel: parseInt(i.nivel) || 0
-        }));
+        if (isNaN(usuarioId)) {
+            return res.status(400).json({ error: "ID de usuario inválido" });
+        }
+
+        // --- LIMPIEZA Y MAPEADO SEGÚN SCHEMA.PRISMA ---
+        
+        const expLimpia = (data.experiencia || [])
+            .filter(e => e.cargo && e.cargo.trim() !== "")
+            .map(e => ({ 
+                cargo: e.cargo, 
+                empresa: e.empresa || "", 
+                periodo: e.periodo || "" 
+            }));
+
+        const eduLimpia = (data.educacion || [])
+            .filter(e => e.titulo && e.titulo.trim() !== "")
+            .map(e => ({ 
+                titulo: e.titulo, 
+                institucion: e.institucion || "", 
+                periodo: e.periodo || "" 
+            }));
+
+        // CORRECCIÓN AQUÍ: El modelo Referencia usa 'celular' no 'telefono'
+        const refLimpia = (data.referencias || [])
+            .filter(r => r.nombre && r.nombre.trim() !== "")
+            .map(r => ({ 
+                nombre: r.nombre, 
+                cargo: r.cargo || "", 
+                celular: r.telefono || r.celular || "" // Mapeamos telefono del front a celular del back
+            }));
+
+        const aptLimpia = (data.aptitudes || [])
+            .filter(a => a.aptitud && a.aptitud.trim() !== "")
+            .map(a => ({ 
+                aptitud: a.aptitud 
+            }));
+
+        const idiLimpia = (data.idiomas || [])
+            .filter(i => i.idioma && i.idioma.trim() !== "")
+            .map(i => ({
+                idioma: i.idioma,
+                nivel: parseInt(i.nivel) || 0 
+            }));
 
         const cvGuardado = await prisma.perfilCV.upsert({
-            where: {
-                usuarioId: usuarioId,
-            },
+            where: { usuarioId: usuarioId },
             update: {
-                telefono: data.telefono,
-                email: data.email,
-                direccion: data.direccion,
-                descripcion: data.descripcion,
-                habilidades: data.habilidades,
-                experiencia: {
-                    deleteMany: {}, 
-                    create: expLimpia
-                },
-                educacion: {
-                    deleteMany: {},
-                    create: eduLimpia
-                },
-                referencias: {
-                    deleteMany: {},
-                    create: refLimpia
-                },
-                aptitudes: {
-                    deleteMany: {},
-                    create: aptLimpia
-                },
-                idiomas: {
-                    deleteMany: {},
-                    create: idiLimpia
-                }
+                telefono: data.telefono || "",
+                email: data.email || "",
+                direccion: data.direccion || "",
+                descripcion: data.descripcion || "",
+                habilidades: data.habilidades || "",
+                experiencia: { deleteMany: {}, create: expLimpia },
+                educacion: { deleteMany: {}, create: eduLimpia },
+                referencias: { deleteMany: {}, create: refLimpia },
+                aptitudes: { deleteMany: {}, create: aptLimpia },
+                idiomas: { deleteMany: {}, create: idiLimpia }
             },
             create: {
                 usuarioId: usuarioId,
-                telefono: data.telefono,
-                email: data.email,
-                direccion: data.direccion,
-                descripcion: data.descripcion,
-                habilidades: data.habilidades,
-                experiencia: {
-                    create: expLimpia
-                },
-                educacion: {
-                    create: eduLimpia
-                },
-                referencias: {
-                    create: refLimpia
-                },
-                aptitudes: {
-                    create: aptLimpia
-                },
-                idiomas: {
-                    create: idiLimpia
-                }
+                telefono: data.telefono || "",
+                email: data.email || "",
+                direccion: data.direccion || "",
+                descripcion: data.descripcion || "",
+                habilidades: data.habilidades || "",
+                experiencia: { create: expLimpia },
+                educacion: { create: eduLimpia },
+                referencias: { create: refLimpia },
+                aptitudes: { create: aptLimpia },
+                idiomas: { create: idiLimpia }
             }
         });
 
         res.status(200).json({ message: "CV guardado correctamente", cv: cvGuardado });
     } catch (error) {
-        console.error("Error al guardar CV:", error);
-        res.status(500).json({ error: "Error interno del servidor al guardar el CV" });
+        console.error("❌ ERROR EN PRISMA:", error);
+        res.status(500).json({ 
+            error: "Error interno del servidor al guardar el CV",
+            detalle: error.message 
+        });
     }
 };
 
 export const getCV = async (req, res) => {
     try {
         const usuarioId = parseInt(req.params.usuarioId);
+        
+        if (isNaN(usuarioId)) {
+            return res.status(400).json({ error: "ID de usuario inválido" });
+        }
+
         const cv = await prisma.perfilCV.findUnique({
             where: { usuarioId: usuarioId },
             include: {

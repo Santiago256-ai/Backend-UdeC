@@ -45,12 +45,20 @@ try {
 }
 
 // ----------------- CONFIGURACIÓN CORS -----------------
+// En tu server.js (Backend)
 const corsOptions = {
-    origin: ['https://frontend-ude-c.vercel.app', 'http://localhost:3000', 'http://localhost:5173'],
-    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    // Agregamos todos los posibles orígenes (tu local y el de producción)
+    origin: [
+        'http://localhost:5173', 
+        'http://localhost:3000', 
+        'https://frontend-ude-c.vercel.app' // Cambia esto por tu URL real de frontend
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'], // Muy importante para JWT
     credentials: true,
-    optionsSuccessStatus: 204
+    optionsSuccessStatus: 200 // Vercel a veces prefiere 200 sobre 204
 };
+
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 // ----------------- MIDDLEWARES -----------------

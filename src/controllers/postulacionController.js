@@ -84,22 +84,24 @@ export const crearPostulacion = async (req, res) => {
 };
 
 // ✅ OBTENER POSTULACIONES POR ID DE VACANTE (ACTUALIZADO CON PERFIL COMPLETO)
+// Localiza esta función en tu backend
 export const obtenerPostulacionesPorVacante = async (req, res) => {
     try {
         const vacanteId = parseInt(req.params.vacanteId);
-        if (isNaN(vacanteId)) return res.status(400).json({ error: "ID inválido." });
-
+        
         const postulaciones = await prisma.postulacion.findMany({
             where: { vacanteId },
             include: { 
                 usuario: {
                     include: {
-                        // Traemos el PerfilCV y todas sus tablas relacionadas
                         cv: {
                             include: {
-                                educacion: true,
-                                experiencia: true,
+                                // AQUÍ ES DONDE FALTABAN ESTAS LÍNEAS:
+                                habilidades: true,   
+                                aptitudes: true,
                                 idiomas: true,
+                                experiencia: true,   // Verifica si en tu esquema es 'experiencia' o 'experiencias'
+                                educacion: true,     // Verifica si es 'educacion' o 'formacion'
                                 referencias: true
                             }
                         }
@@ -111,8 +113,8 @@ export const obtenerPostulacionesPorVacante = async (req, res) => {
     
         res.json(postulaciones);
     } catch (error) {
-        console.error("Error al obtener postulaciones con perfil:", error);
-        res.status(500).json({ error: "Error interno del servidor." });
+        console.error("Error:", error);
+        res.status(500).json({ error: "Error interno" });
     }
 }
 

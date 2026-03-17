@@ -39,32 +39,69 @@ export const register = async (req, res) => {
 };
 
 export const login = async (req, res) => {
-  try {
-    const { correo, password } = req.body;
+  try {
+    const { correo, password } = req.body;
 
-    const usuario = await prisma.usuario.findUnique({ where: { correo } });
-    
-    // Si el usuario existe pero es de login social (no tiene password), retorna error.
-    if (usuario && !usuario.password) {
-        return res.status(401).json({ message: "Por favor, inicia sesión con Google." });
-    }
-    
-    if (!usuario) return res.status(404).json({ message: "Usuario no encontrado" });
+    // 1. Intentar buscar primero en la tabla de Usuario (Egresados/Estudiantes)
+    let usuario = await prisma.usuario.findUnique({ where: { correo } });
+    
+    if (usuario) {
+        // Verificación de password para Egresado
+        if (!usuario.password) {
+            return res.status(401).json({ message: "Por favor, inicia sesión con Google." });
+        }
+        const passwordValida = await bcrypt.compare(password, usuario.password);
+        if (!passwordValida) return res.status(401).json({ message: "Contraseña incorrecta" });
 
-    // El campo password es opcional (String?) en Prisma, pero si existe, lo compara.
-    const passwordValida = await bcrypt.compare(password, usuario.password || '');
-    if (!passwordValida) return res.status(401).json({ message: "Contraseña incorrecta" });
+        const token = jwt.sign(
+            { id: usuario.id, rol: usuario.rol },
+            process.env.JWT_SECRET,
+            { expiresIn: "1d" }
+        );
 
-    const token = jwt.sign(
-      { id: usuario.id, rol: usuario.rol },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
+        // Devolvemos 'tipo: egresado' para el frontend
+        return res.json({ 
+            message: "Login exitoso", 
+            token, 
+            tipo: "egresado", 
+            usuario 
+        });
+    }
 
-    res.json({ message: "Login exitoso", token, usuario }); 
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    // 2. Si no se encontró en Usuario, buscamos en la tabla Empresa
+    const empresa = await prisma.empresa.findUnique({ where: { email: correo } });
+
+    if (empresa) {
+        // Verificación de password para Empresa
+        const passwordValida = await bcrypt.compare(password, empresa.password);
+        if (!passwordValida) return res.status(401).json({ message: "Contraseña incorrecta" });
+
+        const token = jwt.sign(
+            { id: empresa.id, rol: "empresa" },
+            process.env.JWT_SECRET,
+            { expiresIn: "1d" }
+        );
+
+        // Devolvemos 'tipo: empresa' para el frontend
+        return res.json({ 
+            message: "Login exitoso", 
+            token, 
+            tipo: "empresa", 
+            usuario: {
+                id: empresa.id,
+                nombres: empresa.nombre,
+                correo: empresa.email,
+                rol: "empresa"
+            } 
+        });
+    }
+
+    // 3. Si no existe en ninguna de las dos tablas
+    return res.status(404).json({ message: "Usuario o Empresa no encontrados" });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
 
 

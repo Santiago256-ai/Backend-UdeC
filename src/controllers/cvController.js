@@ -23,7 +23,11 @@ export const upsertCV = async (req, res) => {
                 educacion: {
                     deleteMany: {},
                     create: data.educacion || []
-                }
+                },
+                referencias: {
+    deleteMany: {},
+    create: (data.referencias || []).filter(ref => ref.nombre && ref.nombre.trim() !== "")
+}
             },
             create: {
                 usuarioId: usuarioId,
@@ -37,7 +41,11 @@ export const upsertCV = async (req, res) => {
                 },
                 educacion: {
                     create: data.educacion || []
-                }
+                },
+                referencias: {
+    deleteMany: {},
+    create: (data.referencias || []).filter(ref => ref.nombre && ref.nombre.trim() !== "")
+}
             }
         });
 
@@ -55,7 +63,8 @@ export const getCV = async (req, res) => {
             where: { usuarioId: usuarioId },
             include: {
                 experiencia: true,
-                educacion: true
+                educacion: true,
+                referencias: true
             }
         });
 

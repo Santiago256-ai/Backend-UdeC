@@ -6,6 +6,17 @@ export const upsertCV = async (req, res) => {
         const usuarioId = parseInt(req.params.usuarioId);
         const data = req.body;
 
+        // Limpieza de datos: Filtramos los objetos vacíos antes de enviarlos a Prisma
+        const expLimpia = (data.experiencia || []).filter(e => e.cargo && e.cargo.trim() !== "");
+        const eduLimpia = (data.educacion || []).filter(e => e.titulo && e.titulo.trim() !== "");
+        const refLimpia = (data.referencias || []).filter(r => r.nombre && r.nombre.trim() !== "");
+        const aptLimpia = (data.aptitudes || []).filter(a => a.aptitud && a.aptitud.trim() !== "");
+        // Convertimos el nivel a número entero para que coincida con el schema
+        const idiLimpia = (data.idiomas || []).filter(i => i.idioma && i.idioma.trim() !== "").map(i => ({
+            idioma: i.idioma,
+            nivel: parseInt(i.nivel) || 0
+        }));
+
         const cvGuardado = await prisma.perfilCV.upsert({
             where: {
                 usuarioId: usuarioId,
@@ -18,16 +29,24 @@ export const upsertCV = async (req, res) => {
                 habilidades: data.habilidades,
                 experiencia: {
                     deleteMany: {}, 
-                    create: data.experiencia || []
+                    create: expLimpia
                 },
                 educacion: {
                     deleteMany: {},
-                    create: data.educacion || []
+                    create: eduLimpia
                 },
                 referencias: {
-    deleteMany: {},
-    create: (data.referencias || []).filter(ref => ref.nombre && ref.nombre.trim() !== "")
-}
+                    deleteMany: {},
+                    create: refLimpia
+                },
+                aptitudes: {
+                    deleteMany: {},
+                    create: aptLimpia
+                },
+                idiomas: {
+                    deleteMany: {},
+                    create: idiLimpia
+                }
             },
             create: {
                 usuarioId: usuarioId,
@@ -37,15 +56,20 @@ export const upsertCV = async (req, res) => {
                 descripcion: data.descripcion,
                 habilidades: data.habilidades,
                 experiencia: {
-                    create: data.experiencia || []
+                    create: expLimpia
                 },
                 educacion: {
-                    create: data.educacion || []
+                    create: eduLimpia
                 },
                 referencias: {
-    deleteMany: {},
-    create: (data.referencias || []).filter(ref => ref.nombre && ref.nombre.trim() !== "")
-}
+                    create: refLimpia
+                },
+                aptitudes: {
+                    create: aptLimpia
+                },
+                idiomas: {
+                    create: idiLimpia
+                }
             }
         });
 
@@ -64,7 +88,9 @@ export const getCV = async (req, res) => {
             include: {
                 experiencia: true,
                 educacion: true,
-                referencias: true
+                referencias: true,
+                aptitudes: true,
+                idiomas: true
             }
         });
 

@@ -43,6 +43,7 @@ model PerfilCV {
 
   educacion   Educacion[]
   experiencia Experiencia[]
+  aptitudes   Aptitud[]
   idiomas     Idioma[]
   referencias Referencia[]
 }
@@ -65,12 +66,19 @@ model Experiencia {
   perfil   PerfilCV @relation(fields: [perfilId], references: [id], onDelete: Cascade)
 }
 
+model Aptitud {
+  id         Int      @id @default(autoincrement())
+  aptitud    String
+  perfilCV   PerfilCV @relation(fields: [perfilCVId], references: [id], onDelete: Cascade)
+  perfilCVId Int
+}
+
 model Idioma {
-  id       Int      @id @default(autoincrement())
-  idioma   String
-  nivel    String
-  perfilId Int
-  perfil   PerfilCV @relation(fields: [perfilId], references: [id], onDelete: Cascade)
+  id         Int      @id @default(autoincrement())
+  idioma     String
+  nivel      Int      // Almacenaremos el nivel como un entero (0-100) para la barra de progreso
+  perfilCV   PerfilCV @relation(fields: [perfilCVId], references: [id], onDelete: Cascade)
+  perfilCVId Int
 }
 
 model Referencia {

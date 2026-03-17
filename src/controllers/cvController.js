@@ -1,13 +1,11 @@
-// backend/src/controllers/cvController.js (o equivalente)
 import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
-exports.upsertCV = async (req, res) => {
+export const upsertCV = async (req, res) => {
     try {
         const usuarioId = parseInt(req.params.usuarioId);
         const data = req.body;
 
-        // Prisma permite hacer "upsert": Actualizar si existe, o Crear si no existe.
         const cvGuardado = await prisma.perfilCV.upsert({
             where: {
                 usuarioId: usuarioId,
@@ -18,15 +16,13 @@ exports.upsertCV = async (req, res) => {
                 direccion: data.direccion,
                 descripcion: data.descripcion,
                 habilidades: data.habilidades,
-                // Al actualizar, para las relaciones complejas como listas,
-                // la forma más limpia suele ser borrar las anteriores y recrearlas:
                 experiencia: {
                     deleteMany: {}, 
-                    create: data.experiencia
+                    create: data.experiencia || []
                 },
                 educacion: {
                     deleteMany: {},
-                    create: data.educacion
+                    create: data.educacion || []
                 }
             },
             create: {
@@ -37,10 +33,10 @@ exports.upsertCV = async (req, res) => {
                 descripcion: data.descripcion,
                 habilidades: data.habilidades,
                 experiencia: {
-                    create: data.experiencia
+                    create: data.experiencia || []
                 },
                 educacion: {
-                    create: data.educacion
+                    create: data.educacion || []
                 }
             }
         });
@@ -52,8 +48,7 @@ exports.upsertCV = async (req, res) => {
     }
 };
 
-// Y para obtener el CV cuando el usuario entra a la página:
-exports.getCV = async (req, res) => {
+export const getCV = async (req, res) => {
     try {
         const usuarioId = parseInt(req.params.usuarioId);
         const cv = await prisma.perfilCV.findUnique({

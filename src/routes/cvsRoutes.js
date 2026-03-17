@@ -1,14 +1,9 @@
-import express from "express";
-// 1. Agregamos obtenerMiCV a la importación
-import { guardarCV, obtenerMiCV } from "../controllers/cvsController.js"; 
-import { authMiddleware } from "../../middleware/authMiddleware.js";
+import express from 'express';
+import { getCV, upsertCV } from '../controllers/cvController.js'; // Ojo con el .js al final
 
 const router = express.Router();
 
-// 2. Ruta para guardar (la que ya tenías)
-router.post("/guardar", authMiddleware, guardarCV);
-
-// 3. NUEVA RUTA para que el formulario cargue los datos automáticamente
-router.get("/mi-cv", authMiddleware, obtenerMiCV);
+router.get('/:usuarioId', getCV);
+router.post('/:usuarioId', upsertCV);
 
 export default router;

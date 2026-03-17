@@ -17,7 +17,8 @@ import vacantesRoutes from "./routes/vacantesRoutes.js";
 import postulacionesRoutes from "./routes/postulacionesRoutes.js";
 import empresaRoutes from "./routes/empresaRoutes.js";
 import estudianteRoutes from "./routes/estudianteRoutes.js";
-import mensajeriaRoutes from "./routes/mensajeriaRoutes.js"; //
+import mensajeriaRoutes from "./routes/mensajeriaRoutes.js"; 
+import cvsRoutes from "./routes/cvsRoutes.js";
 
 const app = express();
 
@@ -79,6 +80,7 @@ app.use("/api/postulaciones", postulacionesRoutes);
 app.use("/api/empresas", empresaRoutes);
 app.use("/api/estudiantes", estudianteRoutes);
 app.use("/api/mensajeria", mensajeriaRoutes); 
+app.use("/api/cvs", cvsRoutes);
 
 // ----------------- INICIALIZACIÓN -----------------
 const PORT = process.env.PORT || 8080;

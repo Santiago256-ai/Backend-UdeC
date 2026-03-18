@@ -170,3 +170,38 @@ export const listarEmpresas = async (req, res) => {
         res.status(500).json({ error: "Error al listar empresas" });
     }
 };
+
+// backend/controllers/empresaController.js
+
+// 🟢 NUEVO: Función exclusiva para el Panel Administrativo
+export const obtenerEmpresasParaAdmin = async (req, res) => {
+    try {
+        const empresas = await prisma.empresa.findMany({
+            include: {
+                _count: {
+                    select: { vacantes: true } // Esto nos da el número de vacantes publicadas
+                }
+            },
+            orderBy: { nombre: "asc" } // Ordenadas alfabéticamente
+        });
+
+        // Enviamos los datos (Prisma ya omite campos si no los pedimos, pero aquí mandamos todo lo necesario)
+        res.json(empresas);
+    } catch (error) {
+        console.error("❌ Error en obtenerEmpresasParaAdmin:", error);
+        res.status(500).json({ error: "No se pudo cargar la lista de empresas aliadas." });
+    }
+};
+
+// 🟢 NUEVO: Función para que el Admin elimine una empresa
+export const eliminarEmpresaAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await prisma.empresa.delete({
+            where: { id: parseInt(id) }
+        });
+        res.json({ message: "Empresa eliminada correctamente" });
+    } catch (error) {
+        res.status(500).json({ error: "Error al eliminar. Verifique si la empresa tiene vacantes activas." });
+    }
+};

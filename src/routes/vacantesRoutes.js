@@ -4,8 +4,9 @@ import {
     listarVacantes, 
     eliminarVacante, 
     listarVacantesPorEmpresa,
-    // obtenerVacantePorId // 👈 Agrégalo cuando crees la función en el controller
-} from "../controllers/vacanteController.js"; 
+    listarTodasLasVacantesAdmin, // 👈 DEBES AGREGAR ESTA
+    obtenerEstadisticasAdmin    // 👈 DEBES AGREGAR ESTA
+} from "../controllers/vacanteController.js";
 
 const router = express.Router();
 

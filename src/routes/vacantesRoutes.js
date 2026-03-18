@@ -18,8 +18,10 @@ router.get("/", listarVacantes);
 // ✅ Listar vacantes por ID de empresa
 router.get("/empresa/:id", listarVacantesPorEmpresa);
 
-// 🔍 Obtener UNA sola vacante por su ID (Muy útil para ver detalles o iniciar chats)
-// router.get("/:id", obtenerVacantePorId); 
+// vacanteRoutes.js
+// ...
+router.get("/admin/todas", listarTodasLasVacantesAdmin); // Nueva ruta
+// ...
 
 // 🔴 Eliminar vacante
 router.delete("/:id", eliminarVacante);

@@ -129,3 +129,25 @@ export const eliminarVacante = async (req, res) => {
         res.status(500).json({ error: "Error interno al eliminar vacante." });
     }
 };
+
+// vacanteController.js
+
+export const listarTodasLasVacantesAdmin = async (req, res) => {
+    try {
+        const vacantes = await prisma.vacante.findMany({
+            include: {
+                empresa: {
+                    select: {
+                        nombre: true,
+                        nit: true
+                    }
+                }
+            },
+            orderBy: { fechaCreacion: "desc" },
+        });
+        res.json(vacantes);
+    } catch (error) {
+        console.error("❌ Error al listar vacantes para admin:", error);
+        res.status(500).json({ error: "Error interno al obtener todas las vacantes." });
+    }
+};

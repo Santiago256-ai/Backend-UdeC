@@ -3,7 +3,8 @@ import multer from "multer";
 import { 
     crearPostulacion, 
     obtenerPostulacionesPorVacante,
-    actualizarEstadoPostulacion 
+    actualizarEstadoPostulacion,
+    obtenerDetallePostulacionesAdmin
 } from "../controllers/postulacionController.js"; 
 
 const router = express.Router();
@@ -30,15 +31,12 @@ const upload = multer({
 // 1. GET: Obtener postulaciones por ID de Vacante
 router.get("/vacante/:vacanteId", obtenerPostulacionesPorVacante);
 
-// 2. POST: Subir CV y crear postulación
-// Ahora el archivo PDF estará disponible en 'req.file.buffer' dentro del controlador
-router.post(
-  "/upload",
-  upload.single("cv"), 
-  crearPostulacion 
-);
+router.post("/enviar", crearPostulacion);
 
 // 3. PATCH: Actualizar el estado de una postulación
 router.patch("/:id/estado", actualizarEstadoPostulacion);
+
+//Perfil administrador
+router.get("/admin/detalle-completo/:vacanteId", obtenerDetallePostulacionesAdmin);
 
 export default router;

@@ -8,63 +8,35 @@ const supabase = createClient(
 );
 
 // 🟢 Crear una nueva postulación (CON VALIDACIONES DE LÍMITES)
+// postulacionController.js (Versión Limpia 100% Neon)
+
 export const crearPostulacion = async (req, res) => {
   try {
-    // 1. Extraer datos y asegurar que sean números
     const { telefono, vacanteId, usuarioId } = req.body;
-    
     const uId = parseInt(usuarioId || req.user?.id); 
     const vId = parseInt(vacanteId);
 
-    // 2. Validaciones básicas de entrada
-    if (!req.file) {
-      return res.status(400).json({ error: "Debe subir un archivo CV en formato PDF." });
-    }
-    
-    // Verificación crítica de IDs
+    // Validaciones de IDs
     if (isNaN(uId) || isNaN(vId)) {
-      console.error("IDs inválidos:", { uId, vId });
       return res.status(400).json({ error: "ID de usuario o vacante no válido." });
     }
 
-    if (!telefono) {
-      return res.status(400).json({ error: "El teléfono es obligatorio." });
-    }
-
+    // Verificar si la vacante existe y está abierta
     const vacante = await prisma.vacante.findUnique({
-        where: { id: vId },
-        include: { _count: { select: { postulaciones: true } } }
+        where: { id: vId }
     });
 
     if (!vacante) return res.status(404).json({ error: "La vacante no existe." });
     if (vacante.estado === "CERRADA") return res.status(400).json({ error: "Vacante cerrada." });
 
-    // --- SUBIDA A SUPABASE ---
-    const fileName = `${Date.now()}_${uId}_postulacion.pdf`; 
-    
-    const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('hojas_de_vida')
-        .upload(fileName, req.file.buffer, {
-            contentType: 'application/pdf',
-            upsert: true 
-        });
-
-    if (uploadError) {
-        throw new Error(uploadError.message);
-    }
-
-    const { data: { publicUrl } } = supabase.storage
-        .from('hojas_de_vida')
-        .getPublicUrl(fileName);
-
-    // 4. Guardar en Base de Datos
+    // Guardar en Neon (Sin subir nada a Supabase)
     const postulacion = await prisma.postulacion.create({
       data: {
         telefono: String(telefono),
-        cv_url: publicUrl,
         vacanteId: vId,
         usuarioId: uId,
         estado: "PENDIENTE", 
+        // Ya no enviamos cv_url porque el Admin verá el PerfilCV vinculado al usuarioId
       },
       include: { usuario: true }
     });
@@ -73,10 +45,7 @@ export const crearPostulacion = async (req, res) => {
 
   } catch (error) {
     console.error("❌ Error en crearPostulacion:", error);
-    res.status(500).json({ 
-        error: "No se pudo procesar la postulación.", 
-        detalle: error.message 
-    });
+    res.status(500).json({ error: "No se pudo procesar la postulación." });
   }
 };
 
@@ -146,3 +115,41 @@ export const actualizarEstadoPostulacion = async (req, res) => {
         res.status(500).json({ error: "Error al actualizar la postulación." });
     }
 }
+
+// postulacionController.js
+
+export const obtenerDetallePostulacionesAdmin = async (req, res) => {
+    try {
+        const { vacanteId } = req.params;
+
+        const postulaciones = await prisma.postulacion.findMany({
+            where: { 
+                vacanteId: parseInt(vacanteId) 
+            },
+            include: {
+                usuario: {
+                    select: {
+                        nombres: true,
+                        apellidos: true,
+                        correo: true,
+                        cv: {
+                            include: {
+                                educacion: true,
+                                experiencia: true,
+                                aptitudes: true,
+                                idiomas: true,
+                                referencias: true
+                            }
+                        }
+                    }
+                }
+            },
+            orderBy: { fecha: "desc" }
+        });
+
+        res.json(postulaciones);
+    } catch (error) {
+        console.error("❌ Error Admin Postulaciones:", error.message);
+        res.status(500).json({ error: "Error al obtener el listado maestro de candidatos." });
+    }
+};

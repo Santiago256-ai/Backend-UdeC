@@ -18,12 +18,11 @@ router.get("/", listarVacantes);
 // ✅ Listar vacantes por ID de empresa
 router.get("/empresa/:id", listarVacantesPorEmpresa);
 
-// vacanteRoutes.js
-// ...
-router.get("/admin/todas", listarTodasLasVacantesAdmin); // Nueva ruta
-// ...
-
 // 🔴 Eliminar vacante
 router.delete("/:id", eliminarVacante);
+router.get("/admin/todas", listarTodasLasVacantesAdmin); // Nueva ruta
+
+//Control del administrador
+router.get("/stats", obtenerEstadisticasAdmin)
 
 export default router;

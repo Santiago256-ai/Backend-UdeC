@@ -151,3 +151,25 @@ export const listarTodasLasVacantesAdmin = async (req, res) => {
         res.status(500).json({ error: "Error interno al obtener todas las vacantes." });
     }
 };
+
+export const obtenerEstadisticasAdmin = async (req, res) => {
+    try {
+        const [totalVacantes, vacantesAbiertas, vacantesCerradas, totalUsuarios, totalEmpresas] = await Promise.all([
+            prisma.vacante.count(),
+            prisma.vacante.count({ where: { estado: "ABIERTA" } }),
+            prisma.vacante.count({ where: { estado: "CERRADA" } }),
+            prisma.usuario.count({ where: { rol: "estudiante" } }),
+            prisma.empresa.count(),
+        ]);
+
+        res.json({
+            totalVacantes,
+            vacantesAbiertas,
+            vacantesCerradas,
+            totalUsuarios,
+            totalEmpresas
+        });
+    } catch (error) {
+        res.status(500).json({ error: "Error al obtener estadísticas reales" });
+    }
+};

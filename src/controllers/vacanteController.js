@@ -154,63 +154,66 @@ export const listarTodasLasVacantesAdmin = async (req, res) => {
 
 export const obtenerEstadisticasAdmin = async (req, res) => {
     try {
-        // 1. Obtenemos el inicio del día de hoy en hora de Colombia (00:00:00)
         const ahora = new Date();
         const inicioHoyCol = new Date(ahora.toLocaleString("en-US", { timeZone: "America/Bogota" }));
         inicioHoyCol.setHours(0, 0, 0, 0);
 
+        // 1. Ejecutamos los conteos básicos y traemos las empresas
         const [
             totalVacantes, 
             vacantesAbiertas, 
-            vacantesCerradas, 
             totalUsuarios, 
             totalEmpresas, 
             postulacionesHoy,
-            empresasRecientes, // 🟢 NUEVO: Para la tabla de la derecha
-            vacantesPorSector  // 🟢 NUEVO: Para la matriz de la izquierda
+            empresasRecientes,
+            todasLasVacantesConEmpresa // Traemos esto para calcular el sector manualmente
         ] = await Promise.all([
             prisma.vacante.count(),
             prisma.vacante.count({ where: { estado: "ABIERTA" } }),
-            prisma.vacante.count({ where: { estado: "CERRADA" } }),
             prisma.usuario.count({ where: { rol: "estudiante" } }),
             prisma.empresa.count(),
-            prisma.postulacion.count({ 
-                where: { 
-                    fecha: { gte: inicioHoyCol } 
-                } 
-            }),
-            // 2. Traer las últimas 3 empresas registradas
+            prisma.postulacion.count({ where: { fecha: { gte: inicioHoyCol } } }),
             prisma.empresa.findMany({
                 take: 3,
                 orderBy: { id: 'desc' },
-                select: {
-                    id: true,
-                    nombre: true,
-                    nit: true,
-                    // Si no tienes un campo 'estado', podemos omitirlo o usar un valor por defecto
-                }
+                select: { id: true, nombre: true, nit: true }
             }),
-            // 3. Agrupar vacantes por sector para la matriz
-            prisma.vacante.groupBy({
-                by: ['economicSector'],
-                _count: {
-                    _all: true
+            // Traemos las vacantes incluyendo el sector de su empresa
+            prisma.vacante.findMany({
+                select: {
+                    empresa: {
+                        select: { economicSector: true }
+                    }
                 }
             })
         ]);
 
+        // 2. Procesamos los sectores manualmente (ya que economicSector es un Array en tu Schema)
+        const conteoSectores = {};
+        todasLasVacantesConEmpresa.forEach(v => {
+            // Tomamos el primer sector del array de la empresa (o 'Otros' si está vacío)
+            const sector = v.empresa?.economicSector?.[0] || 'Otros';
+            conteoSectores[sector] = (conteoSectores[sector] || 0) + 1;
+        });
+
+        // Convertimos el objeto a un formato que el frontend entienda (el que ya programamos)
+        const vacantesPorSector = Object.keys(conteoSectores).map(sector => ({
+            economicSector: sector,
+            _count: { _all: conteoSectores[sector] }
+        }));
+
         res.json({
             totalVacantes,
             vacantesAbiertas,
-            vacantesCerradas,
             totalUsuarios,
             totalEmpresas,
             postulacionesHoy,
-            empresasRecientes, // 👈 Enviamos los nuevos datos
-            vacantesPorSector   // 👈 Enviamos los nuevos datos
+            empresasRecientes,
+            vacantesPorSector
         });
+
     } catch (error) {
-        console.error("Error en estadísticas completas:", error);
-        res.status(500).json({ error: "Error al obtener estadísticas reales" });
+        console.error("❌ Error en estadísticas:", error.message);
+        res.status(500).json({ error: "Error interno", detalle: error.message });
     }
 };

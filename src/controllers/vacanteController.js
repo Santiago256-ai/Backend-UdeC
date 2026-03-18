@@ -159,20 +159,44 @@ export const obtenerEstadisticasAdmin = async (req, res) => {
         const inicioHoyCol = new Date(ahora.toLocaleString("en-US", { timeZone: "America/Bogota" }));
         inicioHoyCol.setHours(0, 0, 0, 0);
 
-        const [totalVacantes, vacantesAbiertas, vacantesCerradas, totalUsuarios, totalEmpresas, postulacionesHoy] = await Promise.all([
+        const [
+            totalVacantes, 
+            vacantesAbiertas, 
+            vacantesCerradas, 
+            totalUsuarios, 
+            totalEmpresas, 
+            postulacionesHoy,
+            empresasRecientes, // 🟢 NUEVO: Para la tabla de la derecha
+            vacantesPorSector  // 🟢 NUEVO: Para la matriz de la izquierda
+        ] = await Promise.all([
             prisma.vacante.count(),
             prisma.vacante.count({ where: { estado: "ABIERTA" } }),
             prisma.vacante.count({ where: { estado: "CERRADA" } }),
             prisma.usuario.count({ where: { rol: "estudiante" } }),
             prisma.empresa.count(),
-            // 🟢 CORREGIDO: Usamos inicioHoyCol que es la variable definida arriba
             prisma.postulacion.count({ 
                 where: { 
-                    fecha: { 
-                        gte: inicioHoyCol 
-                    } 
+                    fecha: { gte: inicioHoyCol } 
                 } 
             }),
+            // 2. Traer las últimas 3 empresas registradas
+            prisma.empresa.findMany({
+                take: 3,
+                orderBy: { id: 'desc' },
+                select: {
+                    id: true,
+                    nombre: true,
+                    nit: true,
+                    // Si no tienes un campo 'estado', podemos omitirlo o usar un valor por defecto
+                }
+            }),
+            // 3. Agrupar vacantes por sector para la matriz
+            prisma.vacante.groupBy({
+                by: ['economicSector'],
+                _count: {
+                    _all: true
+                }
+            })
         ]);
 
         res.json({
@@ -181,10 +205,12 @@ export const obtenerEstadisticasAdmin = async (req, res) => {
             vacantesCerradas,
             totalUsuarios,
             totalEmpresas,
-            postulacionesHoy 
+            postulacionesHoy,
+            empresasRecientes, // 👈 Enviamos los nuevos datos
+            vacantesPorSector   // 👈 Enviamos los nuevos datos
         });
     } catch (error) {
-        console.error("Error en estadísticas:", error);
+        console.error("Error en estadísticas completas:", error);
         res.status(500).json({ error: "Error al obtener estadísticas reales" });
     }
 };

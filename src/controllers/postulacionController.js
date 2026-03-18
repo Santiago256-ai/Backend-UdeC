@@ -153,3 +153,24 @@ export const obtenerDetallePostulacionesAdmin = async (req, res) => {
         res.status(500).json({ error: "Error al obtener el listado maestro de candidatos." });
     }
 };
+
+// 🟢 NUEVO: Obtener TODAS las postulaciones del sistema (Vista Global Admin)
+export const obtenerTodasLasPostulacionesAdmin = async (req, res) => {
+    try {
+        const postulaciones = await prisma.postulacion.findMany({
+            include: {
+                usuario: {
+                    select: { nombres: true, apellidos: true, correo: true }
+                },
+                vacante: {
+                    select: { titulo: true, empresa: { select: { nombre: true } } }
+                }
+            },
+            orderBy: { fecha: "desc" }
+        });
+        res.json(postulaciones);
+    } catch (error) {
+        console.error("❌ Error al obtener todas las postulaciones:", error.message);
+        res.status(500).json({ error: "Error interno del servidor" });
+    }
+};

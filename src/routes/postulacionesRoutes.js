@@ -4,7 +4,8 @@ import {
     crearPostulacion, 
     obtenerPostulacionesPorVacante,
     actualizarEstadoPostulacion,
-    obtenerDetallePostulacionesAdmin
+    obtenerDetallePostulacionesAdmin,
+    obtenerTodasLasPostulacionesAdmin
 } from "../controllers/postulacionController.js"; 
 
 const router = express.Router();
@@ -38,5 +39,6 @@ router.patch("/:id/estado", actualizarEstadoPostulacion);
 
 //Perfil administrador
 router.get("/admin/detalle-completo/:vacanteId", obtenerDetallePostulacionesAdmin);
+router.get("/admin/todas", obtenerTodasLasPostulacionesAdmin);
 
 export default router;

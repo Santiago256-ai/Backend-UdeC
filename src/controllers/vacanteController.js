@@ -154,12 +154,22 @@ export const listarTodasLasVacantesAdmin = async (req, res) => {
 
 export const obtenerEstadisticasAdmin = async (req, res) => {
     try {
-        const [totalVacantes, vacantesAbiertas, vacantesCerradas, totalUsuarios, totalEmpresas] = await Promise.all([
+        // Obtenemos el inicio del día de hoy (00:00:00)
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+
+        const [totalVacantes, vacantesAbiertas, vacantesCerradas, totalUsuarios, totalEmpresas, postulacionesHoy] = await Promise.all([
             prisma.vacante.count(),
             prisma.vacante.count({ where: { estado: "ABIERTA" } }),
             prisma.vacante.count({ where: { estado: "CERRADA" } }),
             prisma.usuario.count({ where: { rol: "estudiante" } }),
             prisma.empresa.count(),
+            // 🟢 NUEVO: Contar solo postulaciones creadas desde hoy a las 00:00
+            prisma.postulacion.count({ 
+                where: { 
+                    fecha: { gte: hoy } 
+                } 
+            }),
         ]);
 
         res.json({
@@ -167,7 +177,8 @@ export const obtenerEstadisticasAdmin = async (req, res) => {
             vacantesAbiertas,
             vacantesCerradas,
             totalUsuarios,
-            totalEmpresas
+            totalEmpresas,
+            postulacionesHoy // 👈 Enviamos este nuevo dato
         });
     } catch (error) {
         res.status(500).json({ error: "Error al obtener estadísticas reales" });

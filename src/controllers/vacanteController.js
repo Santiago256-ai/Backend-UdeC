@@ -221,12 +221,29 @@ export const obtenerEstadisticasAdmin = async (req, res) => {
         // 4. Procesar datos históricos para el Line Chart (Crecimiento)
         // Nota: Si tu modelo Usuario no tiene createdAt, este ejemplo usa el de Empresa
         // para simular la estructura que espera la gráfica.
-        const mesesLabels = ["Ene", "Feb", "Mar", "Abr", "May", "Jun"];
-        const datosCrecimiento = mesesLabels.map((mes, index) => ({
-            mes: mes,
-            usuarios: Math.floor(totalUsuarios / (6 - index)), // Simulación proporcional si no hay fechas
-            empresas: Math.floor(totalEmpresas / (6 - index))   // Simulación proporcional
-        }));
+        // 🟢 Cambia esta parte en tu controlador:
+
+const mesesLabels = [];
+const ahora_aux = new Date();
+
+// Generamos los últimos 6 meses dinámicamente
+for (let i = 5; i >= 0; i--) {
+    const d = new Date();
+    d.setMonth(ahora_aux.getMonth() - i);
+    const nombreMes = d.toLocaleString('es-ES', { month: 'short' });
+    mesesLabels.push(nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1));
+}
+
+// Ahora los datos se asignarán al mes correcto (el último mes será el actual)
+const datosCrecimiento = mesesLabels.map((mes, index) => {
+    // Si es el último mes del array (el mes actual), ponemos el total real
+    const esMesActual = index === mesesLabels.length - 1;
+    return {
+        mes: mes,
+        usuarios: esMesActual ? totalUsuarios : 0, // Solo muestra el dato en el mes presente
+        empresas: esMesActual ? totalEmpresas : 0
+    };
+});
 
         // 5. Respuesta final combinada
         res.json({

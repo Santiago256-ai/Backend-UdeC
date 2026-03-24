@@ -5,74 +5,78 @@ import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
 import dotenv from "dotenv";
 
-// 🚨 CORRECCIÓN: Usa la importación simple para 'export default'
+// Importación de Firebase Admin
 import admin from "../config/firebase-admin.js"; 
 
 dotenv.config();
 const prisma = new PrismaClient();
 
-// Funciones existentes de register y login (se mantienen)
-// ------------------------------------------------------------------
-
+// =========================================================
+// REGISTRO DE EGRESADOS
+// =========================================================
 export const register = async (req, res) => {
-  try {
-    // Se espera: nombres, apellidos, usuario, correo, password, rol
-    const { nombres, apellidos, usuario, correo, password, rol } = req.body; 
+  try {
+    // Se eliminó 'usuario' y 'rol' ya que no existen en el nuevo modelo Egresado
+    const { nombres, apellidos, correo, password } = req.body; 
 
-    const existe = await prisma.usuario.findUnique({ where: { correo } });
-    if (existe) return res.status(400).json({ message: "El correo ya está registrado" });
+    // 1. Verificar si el correo ya existe en la tabla Egresado
+    const existe = await prisma.egresado.findUnique({ where: { correo } });
+    if (existe) return res.status(400).json({ message: "El correo ya está registrado" });
 
-    // Verificar si el nombre de usuario ya existe
-    const existeUsuario = await prisma.usuario.findUnique({ where: { usuario } });
-    if (existeUsuario) return res.status(400).json({ message: "El nombre de usuario ya está en uso" });
+    // 2. Encriptar contraseña
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // 3. Crear el nuevo registro en la tabla Egresado
+    const nuevoEgresado = await prisma.egresado.create({
+      data: { 
+        nombres, 
+        apellidos, 
+        correo, 
+        password: hashedPassword 
+      },
+    });
 
-    const nuevoUsuario = await prisma.usuario.create({
-      data: { nombres, apellidos, usuario, correo, password: hashedPassword, rol },
-    });
-
-    res.status(201).json(nuevoUsuario);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    res.status(201).json(nuevoEgresado);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
 
+// =========================================================
+// LOGIN MULTIPERFIL (EGRESADO / EMPRESA)
+// =========================================================
 export const login = async (req, res) => {
   try {
     const { correo, password } = req.body;
 
-    // 1. Intentar buscar primero en la tabla de Usuario (Egresados/Estudiantes)
-    let usuario = await prisma.usuario.findUnique({ where: { correo } });
+    // 1. Buscar primero en la tabla de Egresado
+    let egresado = await prisma.egresado.findUnique({ where: { correo } });
     
-    if (usuario) {
-        // Verificación de password para Egresado
-        if (!usuario.password) {
+    if (egresado) {
+        if (!egresado.password) {
             return res.status(401).json({ message: "Por favor, inicia sesión con Google." });
         }
-        const passwordValida = await bcrypt.compare(password, usuario.password);
+        const passwordValida = await bcrypt.compare(password, egresado.password);
         if (!passwordValida) return res.status(401).json({ message: "Contraseña incorrecta" });
 
         const token = jwt.sign(
-            { id: usuario.id, rol: usuario.rol },
+            { id: egresado.id, rol: "egresado" }, // El rol se asigna manualmente como string
             process.env.JWT_SECRET,
             { expiresIn: "1d" }
         );
 
-        // Devolvemos 'tipo: egresado' para el frontend
         return res.json({ 
             message: "Login exitoso", 
             token, 
             tipo: "egresado", 
-            usuario 
+            usuario: egresado 
         });
     }
 
-    // 2. Si no se encontró en Usuario, buscamos en la tabla Empresa
+    // 2. Si no es egresado, buscar en la tabla Empresa
     const empresa = await prisma.empresa.findUnique({ where: { email: correo } });
 
     if (empresa) {
-        // Verificación de password para Empresa
         const passwordValida = await bcrypt.compare(password, empresa.password);
         if (!passwordValida) return res.status(401).json({ message: "Contraseña incorrecta" });
 
@@ -82,7 +86,6 @@ export const login = async (req, res) => {
             { expiresIn: "1d" }
         );
 
-        // Devolvemos 'tipo: empresa' para el frontend
         return res.json({ 
             message: "Login exitoso", 
             token, 
@@ -96,121 +99,76 @@ export const login = async (req, res) => {
         });
     }
 
-    // 3. Si no existe en ninguna de las dos tablas
-    return res.status(404).json({ message: "Usuario o Empresa no encontrados" });
+    // 3. Si no existe en ninguna tabla
+    return res.status(404).json({ message: "Credenciales no encontradas" });
 
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-
-// 🚨 FUNCIÓN CORREGIDA PARA LOGIN SOCIAL
-// ------------------------------------------------------------------
-
+// =========================================================
+// LOGIN SOCIAL (FIREBASE) ADAPTADO A EGRESADOS
+// =========================================================
 export const socialLogin = async (req, res) => {
-  const { idToken } = req.body;
+  const { idToken } = req.body;
 
-  if (!idToken) {
-    return res.status(400).json({ message: "Token de ID de Firebase es requerido." });
-  }
+  if (!idToken) {
+    return res.status(400).json({ message: "Token de ID de Firebase es requerido." });
+  }
 
-  try {
-    // 1. VERIFICAR EL TOKEN CON FIREBASE ADMIN
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
-    const { uid, email, name } = decodedToken; 
+  try {
+    // 1. Verificar el token con Firebase
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const { uid, email, name } = decodedToken; 
 
-    // 2. BUSCAR USUARIO POR CORREO (Prisma)
-    let usuario = await prisma.usuario.findUnique({ 
-        where: { correo: email },
-        select: { id: true, nombres: true, apellidos: true, correo: true, rol: true, firebaseUid: true }
-    });
+    // 2. Buscar en la tabla Egresado
+    let egresado = await prisma.egresado.findUnique({ 
+        where: { correo: email }
+    });
 
-    if (!usuario) {
-      // 3. REGISTRAR NUEVO USUARIO SOCIALMENTE
-      console.log(`Usuario ${email} no encontrado. Registrando nuevo usuario.`);
-      
-      const defaultRole = "estudiante"; 
-      
-      // Lógica para asignar Nombres, Apellidos y Username Único
-      // -----------------------------------------------------------
-      const parts = name ? name.split(' ').filter(p => p.length > 0) : ['Usuario', 'Social'];
-      const nombres = parts.length > 0 ? parts[0] : 'Usuario';
-      const apellidos = parts.length > 1 ? parts.slice(1).join(' ') : 'Social';
-      
-      // Generar nombre de usuario inicial a partir del email
-      const baseUsername = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ''); // Limpia caracteres especiales
-      let username = baseUsername;
-      let counter = 0;
-      
-      // Bucle para garantizar la unicidad del nombre de usuario
-      while (await prisma.usuario.findUnique({ where: { usuario: username } })) {
-          counter++;
-          username = `${baseUsername}${counter}`;
-          if (counter > 100) { // Límite de seguridad
-            throw new Error("No se pudo generar un nombre de usuario único.");
-          }
-      }
-      // -----------------------------------------------------------
+    if (!egresado) {
+      // 3. Registrar automáticamente como Egresado si no existe
+      const parts = name ? name.split(' ').filter(p => p.length > 0) : ['Egresado', 'UdeC'];
+      const nombres = parts[0];
+      const apellidos = parts.slice(1).join(' ') || 'Social';
+      
+      egresado = await prisma.egresado.create({
+        data: { 
+            correo: email,
+            nombres: nombres,
+            apellidos: apellidos,
+            firebaseUid: uid, 
+            password: null // Login social no requiere password local
+        }
+      });
+    } else {
+        // 4. Actualizar el UID si el registro era tradicional
+        if (!egresado.firebaseUid) {
+            egresado = await prisma.egresado.update({
+                where: { id: egresado.id },
+                data: { firebaseUid: uid }
+            });
+        }
+    }
+    
+    // 5. Generar JWT de sesión
+    const token = jwt.sign(
+      { id: egresado.id, rol: "egresado" },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
 
-      usuario = await prisma.usuario.create({
-        data: { 
-            correo: email,
-            nombres: nombres,
-            apellidos: apellidos,
-            usuario: username, // ⬅️ Nombre de usuario único
-            rol: defaultRole,
-            firebaseUid: uid, 
-            password: null // ⬅️ Se establece como null ya que es opcional
-        },
-        select: { // Selecciona solo los campos que quieres devolver
-            id: true,
-            nombres: true,
-            apellidos: true,
-            correo: true,
-            rol: true
-        }
-      });
-    } else {
-        // 4. LOGIN EXITOSO: Actualizar el UID si el registro era tradicional sin UID de Firebase
-        if (!usuario.firebaseUid) {
-             await prisma.usuario.update({
-                where: { id: usuario.id },
-                data: { firebaseUid: uid }
-            });
-            // Recargar el objeto usuario después de la actualización si es necesario.
-            usuario = await prisma.usuario.findUnique({ 
-                where: { id: usuario.id },
-                select: { id: true, nombres: true, apellidos: true, correo: true, rol: true }
-            });
-        }
-    }
-    
-    // 5. GENERAR TU PROPIO JWT DE SESIÓN
-    const token = jwt.sign(
-      { id: usuario.id, rol: usuario.rol },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
+    // 6. Respuesta
+    return res.status(200).json({
+        message: "Login social exitoso",
+        token: token,
+        tipo: "egresado",
+        usuario: egresado
+    });
 
-    // 6. RESPUESTA EXITOSA
-    return res.status(200).json({
-        message: "Login social exitoso",
-        token: token,
-        usuario: {
-            id: usuario.id,
-            nombres: usuario.nombres, 
-            apellidos: usuario.apellidos,
-            correo: usuario.correo,
-            rol: usuario.rol 
-        }
-    });
-
-  } catch (error) {
-    console.error("Error en el Login Social:", error.message);
-    if (error.code === 'auth/id-token-expired' || error.code === 'auth/argument-error') {
-        return res.status(401).json({ message: "Token de autenticación inválido o expirado." });
-    }
-    return res.status(500).json({ message: "Error interno del servidor en login social." });
-  }
+  } catch (error) {
+    console.error("Error en el Login Social:", error.message);
+    return res.status(500).json({ message: "Error interno del servidor en login social." });
+  }
 };

@@ -179,7 +179,7 @@ export const obtenerEstadisticasAdmin = async (req, res) => {
         ] = await Promise.all([
             prisma.vacante.count(),
             prisma.vacante.count({ where: { estado: "ABIERTA" } }),
-            prisma.usuario.count({ where: { rol: "estudiante" } }),
+            prisma.egresado.count(),
             prisma.empresa.count(),
             prisma.postulacion.count({ where: { fecha: { gte: inicioHoyCol } } }),
             prisma.empresa.findMany({
@@ -196,10 +196,9 @@ export const obtenerEstadisticasAdmin = async (req, res) => {
                 _count: { _all: true }
             }),
             // Crecimiento de usuarios (últimos 6 meses)
-            prisma.usuario.findMany({
-                where: { rol: "estudiante", id: { gte: 0 } }, // Asumiendo que no tienes createdAt, filtramos por IDs recientes o fecha si la tienes
-                select: { id: true } // Si tienes campo 'createdAt', úsalo aquí
-            }),
+            prisma.egresado.findMany({
+    select: { id: true } 
+}),
             prisma.empresa.findMany({
                 where: { createdAt: { gte: seisMesesAtras } },
                 select: { createdAt: true }

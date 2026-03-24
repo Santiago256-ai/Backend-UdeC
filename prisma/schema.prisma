@@ -12,32 +12,36 @@ datasource db {
 // MODELOS DE USUARIO Y PERFIL CV
 // =========================================================
 
-model Usuario {
-  id            Int           @id @default(autoincrement())
-  nombres       String
-  apellidos     String
-  usuario       String        @unique
-  correo        String        @unique
-  password      String?
-  firebaseUid   String?       @unique 
-  rol           String        @default("estudiante")
+model Egresado {
+  id                Int            @id @default(autoincrement())
+  nombres           String
+  apellidos         String
+  correo            String         @unique 
+  password          String?
+  firebaseUid       String?        @unique 
   
-  cv            PerfilCV?
-  postulaciones Postulacion[]
-  mensajesEnviados  Mensaje[]   @relation("SentMessages")
-  mensajesRecibidos Mensaje[]   @relation("ReceivedMessages")
+  // Relación con el Perfil
+  cv                PerfilCV?
+
+  // Relaciones actualizadas (el campo se sigue llamando igual, pero apunta a Egresado)
+  postulaciones     Postulacion[]
+  mensajesEnviados  Mensaje[]      @relation("SentMessages")
+  mensajesRecibidos Mensaje[]      @relation("ReceivedMessages")
   notificaciones    Notificacion[]
 }
 
 model PerfilCV {
-  id          Int    @id @default(autoincrement())
-  usuarioId   Int    @unique
-  usuario     Usuario @relation(fields: [usuarioId], references: [id])
+  id          Int       @id @default(autoincrement())
+  egresadoId  Int       @unique // Antes era usuarioId
+  egresado    Egresado  @relation(fields: [egresadoId], references: [id])
 
-  telefono    String?
-  email       String?
+  // Nuevos campos del formulario
+  celular     String?
+  facultad    String?   
+  programa    String?   
+   
+  // Campos previos
   direccion   String?
-
   descripcion String?
   habilidades String?
 
@@ -148,11 +152,11 @@ model Postulacion {
   fecha      DateTime @default(now())
 
   vacanteId  Int
-  usuarioId  Int
+  egresadoId Int
   vacante    Vacante  @relation(fields: [vacanteId], references: [id])
-  usuario    Usuario  @relation(fields: [usuarioId], references: [id])
+  egresado   Egresado @relation(fields: [egresadoId], references: [id])
 
-  @@unique([vacanteId, usuarioId]) 
+  @@unique([vacanteId, egresadoId]) 
 }
 
 // =========================================================
@@ -170,10 +174,10 @@ model Mensaje {
   vacante         Vacante? @relation(fields: [vacanteId], references: [id])
   senderEmpresaId Int?
   senderEmpresa   Empresa? @relation("EmpresaSentMessages", fields: [senderEmpresaId], references: [id])
-  senderUsuarioId Int?
-  senderUsuario   Usuario? @relation("SentMessages", fields: [senderUsuarioId], references: [id])
+  senderEgresadoId Int?       // Cambiado de senderUsuarioId
+  senderEgresado   Egresado?  @relation("SentMessages", fields: [senderEgresadoId], references: [id])
   receiverId      Int
-  receiver        Usuario  @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  receiver         Egresado   @relation("ReceivedMessages", fields: [receiverId], references: [id])
   
   notificacion    Notificacion?
 }
@@ -187,6 +191,6 @@ model Notificacion {
   referenciaId Int?
   mensajeId    Int?     @unique
   mensaje      Mensaje? @relation(fields: [mensajeId], references: [id])
-  usuarioId    Int
-  usuario      Usuario  @relation(fields: [usuarioId], references: [id])
+  egresadoId   Int
+  egresado     Egresado  @relation(fields: [egresadoId], references: [id])
 }

@@ -168,13 +168,13 @@ export const obtenerEstadisticasAdmin = async (req, res) => {
         const [
             totalVacantes, 
             vacantesAbiertas, 
-            totalUsuarios, 
+            totalEgresados, 
             totalEmpresas, 
             postulacionesHoy,
             empresasRecientes,
             todasLasVacantesConEmpresa,
             postulacionesPorEstado, // 🟢 Datos para el Donut Chart
-            usuariosHistoricos,     // 🟢 Datos para el Line Chart
+            egresadosHistoricos,     // 🟢 Datos para el Line Chart
             empresasHistoricas      // 🟢 Datos para el Line Chart
         ] = await Promise.all([
             prisma.vacante.count(),
@@ -195,7 +195,7 @@ export const obtenerEstadisticasAdmin = async (req, res) => {
                 by: ['estado'],
                 _count: { _all: true }
             }),
-            // Crecimiento de usuarios (últimos 6 meses)
+            // Crecimiento de egresados (últimos 6 meses)
             prisma.egresado.findMany({
     select: { id: true } 
 }),
@@ -239,7 +239,7 @@ const datosCrecimiento = mesesLabels.map((mes, index) => {
     const esMesActual = index === mesesLabels.length - 1;
     return {
         mes: mes,
-        usuarios: esMesActual ? totalUsuarios : 0, // Solo muestra el dato en el mes presente
+        egresados: esMesActual ? totalEgresados : 0, // Solo muestra el dato en el mes presente
         empresas: esMesActual ? totalEmpresas : 0
     };
 });
@@ -248,7 +248,7 @@ const datosCrecimiento = mesesLabels.map((mes, index) => {
         res.json({
             totalVacantes,
             vacantesAbiertas,
-            totalUsuarios,
+            totalEgresados,
             totalEmpresas,
             postulacionesHoy,
             empresasRecientes,

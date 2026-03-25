@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from 'bcryptjs'; 
-import jwt from 'jsonwebtoken'; // ⬅️ IMPORTAR JWT
+import jwt from 'jsonwebtoken'; 
 const prisma = new PrismaClient();
 
 // ⚠️ CLAVE SECRETA: Es crucial usar una clave compleja y leerla desde .env

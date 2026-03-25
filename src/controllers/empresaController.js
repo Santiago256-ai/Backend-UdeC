@@ -16,6 +16,7 @@ export const crearEmpresa = async (req, res) => {
             phones,
             contactName,
             nit,
+            modalidad,
             address,
             city,
             department,
@@ -33,9 +34,10 @@ export const crearEmpresa = async (req, res) => {
         } = req.body;
 
         // 3. Validación de campos obligatorios (Añadimos 'password')
-        if (!companyName || !email || !phones || !contactName || !address || !city || !department || !companyType || !economicSector || !foundationYear || !annualRevenue || !employees || !distributionChannels || !mainClients || !password) {
-            return res.status(400).json({ error: "Faltan campos obligatorios, incluyendo la contraseña" });
-        }
+        // Agregamos 'modalidad' a la lista de validación
+if (!companyName || !email || !phones || !contactName || !address || !city || !department || !companyType || !economicSector || !foundationYear || !annualRevenue || !employees || !distributionChannels || !mainClients || !password || !modalidad) {
+    return res.status(400).json({ error: "Faltan campos obligatorios, incluyendo la modalidad y contraseña" });
+}
         
         // Opcional: Verificar si el email ya existe
         const existingEmpresa = await prisma.empresa.findUnique({
@@ -59,6 +61,7 @@ export const crearEmpresa = async (req, res) => {
                 phones,
                 contactName,
                 nit: nit || null,
+                modalidad: modalidad,
 
                 // Ubicación
                 address,

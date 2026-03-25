@@ -8,47 +8,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// =========================================================
-// MODELOS DE USUARIO Y PERFIL CV
-// =========================================================
-
 model Egresado {
   id                Int            @id @default(autoincrement())
   nombres           String
   apellidos         String
-  correo            String         @unique 
+  correo            String         @unique
   password          String?
-  firebaseUid       String?        @unique 
-  
-  // Relación con el Perfil
-  cv                PerfilCV?
-
-  // Relaciones actualizadas (el campo se sigue llamando igual, pero apunta a Egresado)
-  postulaciones     Postulacion[]
-  mensajesEnviados  Mensaje[]      @relation("SentMessages")
+  firebaseUid       String?        @unique
   mensajesRecibidos Mensaje[]      @relation("ReceivedMessages")
+  mensajesEnviados  Mensaje[]      @relation("SentMessages")
   notificaciones    Notificacion[]
+  cv                PerfilCV?
+  postulaciones     Postulacion[]
 }
 
 model PerfilCV {
-  id          Int       @id @default(autoincrement())
-  egresadoId  Int       @unique // Antes era usuarioId
-  egresado    Egresado  @relation(fields: [egresadoId], references: [id])
-
-  // Nuevos campos del formulario
+  id          Int           @id @default(autoincrement())
+  egresadoId  Int           @unique
   celular     String?
-  facultad    String?   
-  programa    String?   
-   
-  // Campos previos
+  facultad    String?
+  programa    String?
   direccion   String?
   descripcion String?
   habilidades String?
-
+  aptitudes   Aptitud[]
   educacion   Educacion[]
   experiencia Experiencia[]
-  aptitudes   Aptitud[]
   idiomas     Idioma[]
+  egresado    Egresado      @relation(fields: [egresadoId], references: [id])
   referencias Referencia[]
 }
 
@@ -73,16 +60,16 @@ model Experiencia {
 model Aptitud {
   id         Int      @id @default(autoincrement())
   aptitud    String
-  perfilCV   PerfilCV @relation(fields: [perfilCVId], references: [id], onDelete: Cascade)
   perfilCVId Int
+  perfilCV   PerfilCV @relation(fields: [perfilCVId], references: [id], onDelete: Cascade)
 }
 
 model Idioma {
   id         Int      @id @default(autoincrement())
   idioma     String
-  nivel      Int      // Almacenaremos el nivel como un entero (0-100) para la barra de progreso
-  perfilCV   PerfilCV @relation(fields: [perfilCVId], references: [id], onDelete: Cascade)
+  nivel      Int
   perfilCVId Int
+  perfilCV   PerfilCV @relation(fields: [perfilCVId], references: [id], onDelete: Cascade)
 }
 
 model Referencia {
@@ -94,54 +81,48 @@ model Referencia {
   perfil   PerfilCV @relation(fields: [perfilId], references: [id], onDelete: Cascade)
 }
 
-// =========================================================
-// MODELOS DE EMPRESA Y VACANTES
-// =========================================================
-
 model Empresa {
-  id Int @id @default(autoincrement())
-  email              String @unique
-  password           String
-  nombre             String
-  phones             String
-  contactName        String
-  nit                String? @unique
-  address            String
-  city               String
-  department         String
-  companyType        String
-  economicSector     String[] 
-  foundationYear     Int
-  employees          String
-  annualRevenue      String
-  totalAssets        String?
-  equity             String?
+  id                   Int       @id @default(autoincrement())
+  email                String    @unique
+  password             String
+  nombre               String
+  phones               String
+  contactName          String
+  nit                  String?   @unique
+  address              String
+  city                 String
+  department           String
+  companyType          String
+  economicSector       String[]
+  foundationYear       Int
+  employees            String
+  annualRevenue        String
+  totalAssets          String?
+  equity               String?
   distributionChannels String[]
-  mainClients        String
-  emailAuthorization Boolean @default(false)
-  createdAt          DateTime @default(now())
-
-  vacantes           Vacante[]
-  mensajesEnviados   Mensaje[] @relation("EmpresaSentMessages")
+  mainClients          String
+  emailAuthorization   Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  mensajesEnviados     Mensaje[] @relation("EmpresaSentMessages")
+  vacantes             Vacante[]
 }
 
 model Vacante {
-  id            Int      @id @default(autoincrement())
-  titulo        String
-  descripcion   String
-  ubicacion     String
-  tipo          String
-  modalidad     String
-  salario       String?
-  fechaCreacion DateTime @default(now())
-  fechaCierre   DateTime?
+  id                Int           @id @default(autoincrement())
+  titulo            String
+  descripcion       String
+  ubicacion         String
+  tipo              String
+  modalidad         String
+  salario           String?
+  fechaCreacion     DateTime      @default(now())
+  fechaCierre       DateTime?
   limitePostulantes Int?
-  estado        String   @default("ABIERTA")
-
-  empresaId     Int
-  empresa       Empresa  @relation(fields: [empresaId], references: [id])
-  postulaciones Postulacion[]
-  mensajes      Mensaje[]
+  estado            String        @default("ABIERTA")
+  empresaId         Int
+  mensajes          Mensaje[]
+  postulaciones     Postulacion[]
+  empresa           Empresa       @relation(fields: [empresaId], references: [id])
 }
 
 model Postulacion {
@@ -150,36 +131,29 @@ model Postulacion {
   estado     String   @default("PENDIENTE")
   chatActivo Boolean  @default(true)
   fecha      DateTime @default(now())
-
   vacanteId  Int
   egresadoId Int
-  vacante    Vacante  @relation(fields: [vacanteId], references: [id])
   egresado   Egresado @relation(fields: [egresadoId], references: [id])
+  vacante    Vacante  @relation(fields: [vacanteId], references: [id])
 
-  @@unique([vacanteId, egresadoId]) 
+  @@unique([vacanteId, egresadoId])
 }
 
-// =========================================================
-// CHAT Y NOTIFICACIONES
-// =========================================================
-
 model Mensaje {
-  id         Int      @id @default(autoincrement())
-  contenido  String
-  fechaEnvio DateTime @default(now())
-  read       Boolean  @default(false)
-  senderType String
-
-  vacanteId       Int?
-  vacante         Vacante? @relation(fields: [vacanteId], references: [id])
-  senderEmpresaId Int?
-  senderEmpresa   Empresa? @relation("EmpresaSentMessages", fields: [senderEmpresaId], references: [id])
-  senderEgresadoId Int?       // Cambiado de senderUsuarioId
-  senderEgresado   Egresado?  @relation("SentMessages", fields: [senderEgresadoId], references: [id])
-  receiverId      Int
-  receiver         Egresado   @relation("ReceivedMessages", fields: [receiverId], references: [id])
-  
-  notificacion    Notificacion?
+  id               Int           @id @default(autoincrement())
+  contenido        String
+  fechaEnvio       DateTime      @default(now())
+  read             Boolean       @default(false)
+  senderType       String
+  vacanteId        Int?
+  senderEmpresaId  Int?
+  senderEgresadoId Int?
+  receiverId       Int
+  receiver         Egresado      @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  senderEgresado   Egresado?     @relation("SentMessages", fields: [senderEgresadoId], references: [id])
+  senderEmpresa    Empresa?      @relation("EmpresaSentMessages", fields: [senderEmpresaId], references: [id])
+  vacante          Vacante?      @relation(fields: [vacanteId], references: [id])
+  notificacion     Notificacion?
 }
 
 model Notificacion {
@@ -190,7 +164,7 @@ model Notificacion {
   vista        Boolean  @default(false)
   referenciaId Int?
   mensajeId    Int?     @unique
-  mensaje      Mensaje? @relation(fields: [mensajeId], references: [id])
   egresadoId   Int
-  egresado     Egresado  @relation(fields: [egresadoId], references: [id])
+  egresado     Egresado @relation(fields: [egresadoId], references: [id])
+  mensaje      Mensaje? @relation(fields: [mensajeId], references: [id])
 }

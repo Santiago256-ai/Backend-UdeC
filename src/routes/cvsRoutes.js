@@ -3,7 +3,7 @@ import { getCV, upsertCV } from '../controllers/cvController.js'; // Ojo con el 
 
 const router = express.Router();
 
-router.get('/:usuarioId', getCV);
-router.post('/:usuarioId', upsertCV);
+router.get('/:egresadoId', cvController.getCV);
+router.post('/:egresadoId', cvController.upsertCV);
 
 export default router;

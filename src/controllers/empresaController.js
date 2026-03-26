@@ -38,10 +38,11 @@ export const crearEmpresa = async (req, res) => {
 if (!companyName || !email || !phones || !contactName || !address || !city || !department || !companyType || !economicSector || !foundationYear || !annualRevenue || !employees || !distributionChannels || !mainClients || !password || !modalidad) {
     return res.status(400).json({ error: "Faltan campos obligatorios, incluyendo la modalidad y contraseña" });
 }
-        
+                const emailNormalizado = email.toLowerCase().trim();
+
         // Opcional: Verificar si el email ya existe
         const existingEmpresa = await prisma.empresa.findUnique({
-            where: { email: email },
+            where: { email: emailNormalizado },
         });
 
         if (existingEmpresa) {
@@ -56,7 +57,7 @@ if (!companyName || !email || !phones || !contactName || !address || !city || !d
             data: {
                 // Información Básica
                 nombre: companyName,
-                email,
+                email: emailNormalizado,
                 password: hashedPassword, // ⬅️ GUARDAR EL HASH
                 phones,
                 contactName,
@@ -106,16 +107,20 @@ if (!companyName || !email || !phones || !contactName || !address || !city || !d
 // 🔐 NUEVA FUNCIÓN: Iniciar sesión de la empresa
 export const loginEmpresa = async (req, res) => {
     try {
-        // En tu frontend envías 'identificador' y 'contraseña', aquí los mapeamos a 'email' y 'password'
-        const { identificador: email, contraseña: password } = req.body; 
+        // 1. Extraemos los datos del body
+        const { identificador, contraseña: password } = req.body; 
 
-        if (!email || !password) {
+        // 2. Validamos que existan antes de transformar
+        if (!identificador || !password) {
             return res.status(400).json({ error: "Faltan credenciales (email y password)." });
         }
 
+        // 3. Ahora sí, normalizamos usando 'identificador'
+        const correoABuscar = identificador.toLowerCase().trim();
+
         // 1. Buscar la empresa por email
         const empresa = await prisma.empresa.findUnique({
-            where: { email },
+            where: { email: correoABuscar },
         });
 
         if (!empresa) {

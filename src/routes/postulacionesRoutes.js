@@ -35,7 +35,7 @@ router.get("/vacante/:vacanteId", obtenerPostulacionesPorVacante);
 router.post("/enviar", crearPostulacion);
 
 // 3. PATCH: Actualizar el estado de una postulación
-router.patch("/:id/estado", actualizarEstadoPostulacion);
+router.put("/:id/estado", actualizarEstadoPostulacion);
 
 //Perfil administrador
 router.get("/admin/detalle-completo/:vacanteId", obtenerDetallePostulacionesAdmin);

@@ -90,12 +90,24 @@ export const listarVacantesPorEmpresa = async (req, res) => {
 };
 
 // 🟡 3. Listar todas las vacantes (Para el feed de estudiantes)
+// 🟡 3. Listar todas las vacantes (Para el feed de egresados)
 export const listarVacantes = async (req, res) => {
     try {
         const vacantes = await prisma.vacante.findMany({
             where: {
-                // Opcional: Solo mostrar vacantes abiertas
                 estado: "ABIERTA"
+            },
+            include: {
+                // 🟢 ESTO ES LO QUE NECESITAMOS:
+                empresa: {
+                    select: { nombre: true, logo: true } // O los campos que necesites de la empresa
+                },
+                postulaciones: {
+                    select: { egresadoId: true } // Solo traemos los IDs para no sobrecargar la respuesta
+                },
+                _count: {
+                    select: { postulaciones: true } // Útil para mostrar "6 cupos" o similares
+                }
             },
             orderBy: { id: "desc" },
         });

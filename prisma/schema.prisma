@@ -93,6 +93,7 @@ model Empresa {
   phones               String
   contactName          String
   nit                  String?   @unique
+  modalidad            String?
   address              String
   city                 String
   department           String

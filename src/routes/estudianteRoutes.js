@@ -26,9 +26,9 @@ router.post("/guardar-cv", authMiddleware, guardarCV);
 // 1. Ver mis postulaciones
 router.get("/usuario/:usuarioId", authMiddleware, async (req, res) => {
     try {
-        const usuarioId = parseInt(req.params.usuarioId);
+        const uId = parseInt(req.params.usuarioId);
         const postulaciones = await prisma.postulacion.findMany({
-            where: { usuarioId },
+            where: { egresadoId: uId }, // ✅ CAMBIAR 'usuarioId' por 'egresadoId'
             include: { vacante: true },
         });
         res.json(postulaciones);
@@ -38,36 +38,43 @@ router.get("/usuario/:usuarioId", authMiddleware, async (req, res) => {
 });
 
 // 2. Postularse a una vacante
+// 2. Postularse a una vacante
 router.post("/:vacanteId/postular", authMiddleware, async (req, res) => {
     try {
         const { telefono } = req.body;
-        const vacanteId = parseInt(req.params.vacanteId);
+        const vId = parseInt(req.params.vacanteId);
         
-        // FORZAMOS QUE SEA NÚMERO (si tu DB usa IDs numéricos)
-        const usuarioId = parseInt(req.user.id); 
+        // Usamos uId para no confundirnos, viene del token (authMiddleware)
+        const uId = parseInt(req.user.id); 
 
-        if (isNaN(vacanteId) || isNaN(usuarioId)) {
+        if (isNaN(vId) || isNaN(uId)) {
             return res.status(400).json({ error: "ID de vacante o usuario inválido" });
         }
 
-        const perfil = await prisma.perfilCV.findUnique({ where: { usuarioId } });
-        if (!perfil) {
-            return res.status(400).json({ error: "Primero debes crear tu hoja de vida digital" });
-        }
+        // 1. Buscamos el perfil usando el nombre correcto: egresadoId
+        // Cambiamos 'id' por 'uId' que es la variable definida arriba
+        const perfil = await prisma.perfilCV.findUnique({
+            where: { egresadoId: uId } 
+        });
 
+        // 2. Creamos la postulación con los nombres exactos de tu MODELO
         const postulacion = await prisma.postulacion.create({
             data: {
-                vacanteId: vacanteId,
-                usuarioId: usuarioId, // VERIFICA EN TU SCHEMA SI ES 'usuarioId' o 'estudianteId'
-                telefono: telefono || perfil.telefono || "Sin teléfono",
+                vacanteId: vId,
+                egresadoId: uId, // ✅ Coincide con tu Schema
+                // En PerfilCV el campo es 'celular', no 'telefono'
+                telefono: telefono || perfil?.celular || "Sin teléfono", 
                 estado: "PENDIENTE"
             },
         });
 
         res.json({ message: "¡Postulación exitosa!", postulacion });
     } catch (error) {
-        console.error("ERROR EN POSTULACIÓN:", error); // Esto te dará el detalle exacto en la consola de Vercel
-        res.status(500).json({ error: "Error al procesar la postulación", detalle: error.message });
+        console.error("ERROR EN POSTULACIÓN:", error.message);
+        res.status(500).json({ 
+            error: "Error al procesar la postulación", 
+            detalle: error.message 
+        });
     }
 });
 

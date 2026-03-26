@@ -54,7 +54,7 @@ export const upsertCV = async (req, res) => {
             where: { egresadoId: egresadoId },
             update: {
                 celular: data.celular || "",
-                email: data.email || "",
+                
                 direccion: data.direccion || "",
                 descripcion: data.descripcion || "",
                 habilidades: data.habilidades || "",
@@ -67,7 +67,7 @@ export const upsertCV = async (req, res) => {
             create: {
     egresadoId: egresadoId,
     celular: data.celular || "",
-    email: data.email || "",
+    
     direccion: data.direccion || "",
     descripcion: data.descripcion || "",
     habilidades: data.habilidades || "",

@@ -62,6 +62,7 @@ export const crearVacante = async (req, res) => {
 };
 
 // 🟡 2. Listar vacantes por ID de empresa
+// 🟡 2. Listar vacantes por ID de empresa (CORREGIDO PARA EL CONTADOR)
 export const listarVacantesPorEmpresa = async (req, res) => {
     try {
         const empresaId = parseInt(req.params.id); 
@@ -72,6 +73,12 @@ export const listarVacantesPorEmpresa = async (req, res) => {
 
         const vacantes = await prisma.vacante.findMany({
             where: { empresaId: empresaId }, 
+            include: {
+                // ESTO ES LO QUE TE FALTA:
+                _count: {
+                    select: { postulaciones: true }
+                }
+            },
             orderBy: { id: "desc" },
         });
 

@@ -3,10 +3,10 @@ const prisma = new PrismaClient();
 
 export const upsertCV = async (req, res) => {
     try {
-        const usuarioId = parseInt(req.params.usuarioId);
+        const egresadoId = parseInt(req.params.egresadoId);
         const data = req.body;
 
-        if (isNaN(usuarioId)) {
+        if (isNaN(egresadoId)) {
             return res.status(400).json({ error: "ID de usuario inválido" });
         }
 
@@ -28,14 +28,14 @@ export const upsertCV = async (req, res) => {
                 periodo: e.periodo || "" 
             }));
 
-        // CORRECCIÓN AQUÍ: El modelo Referencia usa 'celular' no 'telefono'
+        // CORRECCIÓN AQUÍ: El modelo Referencia usa 'celular' no 'celular'
         const refLimpia = (data.referencias || [])
-            .filter(r => r.nombre && r.nombre.trim() !== "")
-            .map(r => ({ 
-                nombre: r.nombre, 
-                cargo: r.cargo || "", 
-                celular: r.telefono || r.celular || "" // Mapeamos telefono del front a celular del back
-            }));
+    .filter(r => r.nombre && r.nombre.trim() !== "")
+    .map(r => ({ 
+        nombre: r.nombre, 
+        cargo: r.cargo || "", 
+        celular: String(r.celular || r.telefono || "") // Forzamos a String por si acaso
+    }));
 
         const aptLimpia = (data.aptitudes || [])
             .filter(a => a.aptitud && a.aptitud.trim() !== "")
@@ -51,9 +51,9 @@ export const upsertCV = async (req, res) => {
             }));
 
         const cvGuardado = await prisma.perfilCV.upsert({
-            where: { usuarioId: usuarioId },
+            where: { egresadoId: egresadoId },
             update: {
-                telefono: data.telefono || "",
+                celular: data.celular || "",
                 email: data.email || "",
                 direccion: data.direccion || "",
                 descripcion: data.descripcion || "",
@@ -65,18 +65,19 @@ export const upsertCV = async (req, res) => {
                 idiomas: { deleteMany: {}, create: idiLimpia }
             },
             create: {
-                usuarioId: usuarioId,
-                telefono: data.telefono || "",
-                email: data.email || "",
-                direccion: data.direccion || "",
-                descripcion: data.descripcion || "",
-                habilidades: data.habilidades || "",
-                experiencia: { create: expLimpia },
-                educacion: { create: eduLimpia },
-                referencias: { create: refLimpia },
-                aptitudes: { create: aptLimpia },
-                idiomas: { create: idiLimpia }
-            }
+    egresadoId: egresadoId,
+    celular: data.celular || "",
+    email: data.email || "",
+    direccion: data.direccion || "",
+    descripcion: data.descripcion || "",
+    habilidades: data.habilidades || "",
+    // IMPORTANTE: Asegúrate de incluir las relaciones también en el create
+    experiencia: { create: expLimpia },
+    educacion: { create: eduLimpia },
+    referencias: { create: refLimpia },
+    aptitudes: { create: aptLimpia },
+    idiomas: { create: idiLimpia }
+}
         });
 
         res.status(200).json({ message: "CV guardado correctamente", cv: cvGuardado });
@@ -91,14 +92,14 @@ export const upsertCV = async (req, res) => {
 
 export const getCV = async (req, res) => {
     try {
-        const usuarioId = parseInt(req.params.usuarioId);
+        const egresadoId = parseInt(req.params.egresadoId);
         
-        if (isNaN(usuarioId)) {
+        if (isNaN(egresadoId)) {
             return res.status(400).json({ error: "ID de usuario inválido" });
         }
 
         const cv = await prisma.perfilCV.findUnique({
-            where: { usuarioId: usuarioId },
+            where: { egresadoId: egresadoId },
             include: {
                 experiencia: true,
                 educacion: true,

@@ -34,7 +34,7 @@ export const upsertCV = async (req, res) => {
     .map(r => ({ 
         nombre: r.nombre, 
         cargo: r.cargo || "", 
-        celular: String(r.celular || r.telefono || "") // Forzamos a String por si acaso
+        celular: String(r.celular || "") // 👈 Aseguramos que nunca sea null/undefined
     }));
 
         const aptLimpia = (data.aptitudes || [])

@@ -12,13 +12,13 @@ const supabase = createClient(
 
 export const crearPostulacion = async (req, res) => {
   try {
-    const { telefono, vacanteId, usuarioId } = req.body;
-    const uId = parseInt(usuarioId || req.user?.id); 
+    const { telefono, vacanteId, egresadoId } = req.body;
+    const uId = parseInt(egresadoId || req.user?.id); 
     const vId = parseInt(vacanteId);
 
     // Validaciones de IDs
     if (isNaN(uId) || isNaN(vId)) {
-      return res.status(400).json({ error: "ID de usuario o vacante no válido." });
+      return res.status(400).json({ error: "ID de egresado o vacante no válido." });
     }
 
     // Verificar si la vacante existe y está abierta
@@ -36,7 +36,7 @@ export const crearPostulacion = async (req, res) => {
         vacanteId: vId,
         egresadoId: uId,
         estado: "PENDIENTE", 
-        // Ya no enviamos cv_url porque el Admin verá el PerfilCV vinculado al usuarioId
+        // Ya no enviamos cv_url porque el Admin verá el PerfilCV vinculado al egresadoId
       },
       include: { egresado: true }
     });
@@ -105,7 +105,7 @@ export const actualizarEstadoPostulacion = async (req, res) => {
         const postulacionActualizada = await prisma.postulacion.update({
             where: { id: postulacionId },
             data: { estado: estado.toUpperCase() },
-            include: { usuario: true } 
+            include: { egresado: true } 
         });
 
         res.json(postulacionActualizada);
@@ -127,7 +127,7 @@ export const obtenerDetallePostulacionesAdmin = async (req, res) => {
                 vacanteId: parseInt(vacanteId) 
             },
             include: {
-                usuario: {
+                egresado: {
                     select: {
                         nombres: true,
                         apellidos: true,
@@ -159,7 +159,7 @@ export const obtenerTodasLasPostulacionesAdmin = async (req, res) => {
     try {
         const postulaciones = await prisma.postulacion.findMany({
             include: {
-                usuario: {
+                egresado: {
                     select: { nombres: true, apellidos: true, correo: true }
                 },
                 vacante: {

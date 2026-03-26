@@ -88,6 +88,7 @@ export const obtenerPostulacionesPorVacante = async (req, res) => {
 }
 
 // 🟢 ACTUALIZAR ESTADO DE POSTULACIÓN
+// 🟢 ACTUALIZAR ESTADO DE POSTULACIÓN (Versión Pipeline Profesional)
 export const actualizarEstadoPostulacion = async (req, res) => {
     try {
         const postulacionId = parseInt(req.params.id);
@@ -97,24 +98,40 @@ export const actualizarEstadoPostulacion = async (req, res) => {
             return res.status(400).json({ error: "Datos inválidos." });
         }
 
-        const estadosValidos = ["PENDIENTE", "ACEPTADA", "RECHAZADA"];
+        // 🆕 Lista expandida para coincidir con el Frontend
+        const estadosValidos = [
+            "PENDIENTE", 
+            "REVISION", 
+            "ENTREVISTA", 
+            "PRUEBA", 
+            "FINALISTA", 
+            "CONTRATADO", 
+            "RECHAZADO"
+        ];
+
         if (!estadosValidos.includes(estado.toUpperCase())) {
-            return res.status(400).json({ error: "Estado no válido." });
+            return res.status(400).json({ 
+                error: `Estado '${estado}' no válido. Use uno de: ${estadosValidos.join(", ")}` 
+            });
         }
 
         const postulacionActualizada = await prisma.postulacion.update({
             where: { id: postulacionId },
             data: { estado: estado.toUpperCase() },
-            include: { egresado: true } 
+            include: { 
+                egresado: true,
+                vacante: { select: { titulo: true } } // Opcional: para saber qué vacante es
+            } 
         });
 
+        console.log(`✅ Postulación ${postulacionId} movida a: ${estado.toUpperCase()}`);
         res.json(postulacionActualizada);
 
     } catch (error) {
         console.error("❌ Error al actualizar estado:", error.message);
-        res.status(500).json({ error: "Error al actualizar la postulación." });
+        res.status(500).json({ error: "Error al actualizar la postulación en la base de datos." });
     }
-}
+};
 
 // postulacionController.js
 

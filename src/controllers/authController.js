@@ -155,6 +155,7 @@ export const requestPasswordReset = async (req, res) => {
     });
 
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${token}`;
+    
 
     // 5. Enviar el correo
     await transporter.sendMail({
@@ -195,8 +196,19 @@ export const resetPassword = async (req, res) => {
       where: { resetToken: token, resetTokenExpiry: { gt: new Date() } }
     });
 
+    const usuario = egresado || empresa;
+    
     if (!egresado && !empresa) {
       return res.status(200).json({ success: false, message: "Token inválido o expirado." });
+    }
+
+    // ✅ CORREGIDO: VALIDACIÓN DE CONTRASEÑA ANTERIOR AQUÍ
+    const esMismaClave = await bcrypt.compare(newPassword, usuario.password);
+    if (esMismaClave) {
+      return res.status(200).json({ 
+        success: false, 
+        message: "La nueva contraseña no puede ser igual a la anterior." 
+      });
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);

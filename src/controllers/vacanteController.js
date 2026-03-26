@@ -90,7 +90,6 @@ export const listarVacantesPorEmpresa = async (req, res) => {
 };
 
 // 🟡 3. Listar todas las vacantes (Para el feed de estudiantes)
-// 🟡 3. Listar todas las vacantes (Para el feed de egresados)
 export const listarVacantes = async (req, res) => {
     try {
         const vacantes = await prisma.vacante.findMany({
@@ -98,22 +97,24 @@ export const listarVacantes = async (req, res) => {
                 estado: "ABIERTA"
             },
             include: {
-                // 🟢 ESTO ES LO QUE NECESITAMOS:
-                empresa: {
-                    select: { nombre: true, logo: true } // O los campos que necesites de la empresa
-                },
+                empresa: true, // Esto trae todos los datos de la empresa (nombre, logo, etc.)
                 postulaciones: {
-                    select: { egresadoId: true } // Solo traemos los IDs para no sobrecargar la respuesta
+                    select: {
+                        egresadoId: true // Solo el ID para comparar en el front
+                    }
                 },
                 _count: {
-                    select: { postulaciones: true } // Útil para mostrar "6 cupos" o similares
+                    select: {
+                        postulaciones: true // Para el contador de cupos
+                    }
                 }
             },
             orderBy: { id: "desc" },
         });
         res.json(vacantes);
     } catch (error) {
-        console.error("❌ Error al listar vacantes:", error);
+        // Esto te dirá en la consola de Vercel exactamente qué palabra está mal
+        console.error("❌ Error detallado de Prisma:", error.message);
         res.status(500).json({ error: "Error interno al listar vacantes." });
     }
 };

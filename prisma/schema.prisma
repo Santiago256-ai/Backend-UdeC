@@ -14,6 +14,8 @@ model Egresado {
   apellidos         String
   correo            String         @unique
   password          String?
+  resetToken       String?  @unique
+  resetTokenExpiry DateTime?
   firebaseUid       String?        @unique
   mensajesRecibidos Mensaje[]      @relation("ReceivedMessages")
   mensajesEnviados  Mensaje[]      @relation("SentMessages")
@@ -85,6 +87,8 @@ model Empresa {
   id                   Int       @id @default(autoincrement())
   email                String    @unique
   password             String
+  resetToken       String?   @unique
+  resetTokenExpiry DateTime?
   nombre               String
   phones               String
   contactName          String

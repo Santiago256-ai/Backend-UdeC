@@ -34,11 +34,11 @@ export const crearPostulacion = async (req, res) => {
       data: {
         telefono: String(telefono),
         vacanteId: vId,
-        usuarioId: uId,
+        egresadoId: uId,
         estado: "PENDIENTE", 
         // Ya no enviamos cv_url porque el Admin verá el PerfilCV vinculado al usuarioId
       },
-      include: { usuario: true }
+      include: { egresado: true }
     });
     
     res.status(201).json(postulacion);
@@ -58,7 +58,7 @@ export const obtenerPostulacionesPorVacante = async (req, res) => {
         const postulaciones = await prisma.postulacion.findMany({
             where: { vacanteId },
             include: { 
-                usuario: {
+                egresado: {
                     include: {
                         cv: {
                             include: {

@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 // 🟢 1. Crear una nueva vacante (CORREGIDO con límites y validación de empresa)
+// 🟢 1. Crear una nueva vacante (ACTUALIZADO con nuevos campos)
 export const crearVacante = async (req, res) => {
     try {
         console.log("📩 Datos recibidos:", req.body);
@@ -10,24 +11,26 @@ export const crearVacante = async (req, res) => {
             titulo, 
             descripcion, 
             ubicacion,
-            tipo,
+            tipo, // Tipo de contrato
+            jornada,      // 🆕 Nuevo
             modalidad,
+            tipoSalario,  // 🆕 Nuevo
             salario,
+            horario,      // 🆕 Nuevo
             empresaId,
-            // 🆕 Nuevos campos recibidos
             fechaCierre,
             limitePostulantes 
         } = req.body;
 
         // --- INICIO DE VALIDACIÓN MEJORADA ---
 
-        // 1. Validación de campos obligatorios básicos
-        if (!titulo || !descripcion || !ubicacion || !tipo || !modalidad) {
+        // 1. Validación de campos obligatorios básicos (Actualizada con los nuevos)
+        if (!titulo || !descripcion || !ubicacion || !tipo || !jornada || !modalidad || !tipoSalario || !horario) {
             console.error("❌ ERROR 400: Faltan datos obligatorios.");
-            return res.status(400).json({ error: "Faltan campos obligatorios (título, descripción, ubicación, tipo, modalidad)." });
+            return res.status(400).json({ error: "Faltan campos obligatorios para publicar la vacante." });
         }
         
-        // 2. ✅ VALIDACIÓN CRÍTICA: ID de la Empresa
+        // 2. VALIDACIÓN CRÍTICA: ID de la Empresa
         const idEmpresaNumerico = parseInt(empresaId);
         if (!empresaId || isNaN(idEmpresaNumerico) || idEmpresaNumerico <= 0) {
             console.error(`❌ ERROR 401: ID de empresa inválido. Valor: ${empresaId}`);
@@ -42,13 +45,15 @@ export const crearVacante = async (req, res) => {
                 descripcion, 
                 ubicacion,
                 tipo,
+                jornada,      // 🆕 Guardado en BD
                 modalidad,
+                tipoSalario,  // 🆕 Guardado en BD
                 salario: salario || null,
+                horario,      // 🆕 Guardado en BD
                 empresaId: idEmpresaNumerico,
-                // 🆕 Guardado de nuevos campos con formateo de tipos
                 fechaCierre: fechaCierre ? new Date(fechaCierre) : null,
                 limitePostulantes: limitePostulantes ? parseInt(limitePostulantes) : null,
-                estado: "ABIERTA" // Estado por defecto
+                estado: "ABIERTA" 
             },
         });
 
@@ -57,7 +62,7 @@ export const crearVacante = async (req, res) => {
 
     } catch (error) {
         console.error("❌ Error 500 al crear vacante:", error.message);
-        res.status(500).json({ error: "Error interno al crear la vacante. Verifique la conexión a la base de datos." });
+        res.status(500).json({ error: "Error interno al crear la vacante." });
     }
 };
 

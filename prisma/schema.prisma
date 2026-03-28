@@ -117,9 +117,12 @@ model Vacante {
   titulo            String
   descripcion       String
   ubicacion         String
-  tipo              String
-  modalidad         String
-  salario           String?
+  tipo              String        // Este es el Tipo de Contrato (Fijo, Indefinido, etc.)
+  jornada           String        // NUEVO: Completo, Medio tiempo, etc.
+  modalidad         String        // Presencial, Remoto, Híbrido
+  tipoSalario       String        // NUEVO: Básico, Integral, A convenir
+  salario           String?       // El monto numérico (opcional)
+  horario           String        // NUEVO: Ej: Lunes a Viernes 8am - 5pm
   fechaCreacion     DateTime      @default(now())
   fechaCierre       DateTime?
   limitePostulantes Int?

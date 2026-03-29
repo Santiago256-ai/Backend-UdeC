@@ -156,6 +156,49 @@ export const eliminarVacante = async (req, res) => {
     }
 };
 
+// 🔵 5. Actualizar una vacante existente
+export const actualizarVacante = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const idNumerico = parseInt(id);
+
+        if (isNaN(idNumerico)) {
+            return res.status(400).json({ error: "ID de vacante inválido." });
+        }
+
+        const { 
+            titulo, descripcion, ubicacion, tipo, 
+            jornada, modalidad, tipoSalario, salario, 
+            horario, fechaCierre, limitePostulantes, estado 
+        } = req.body;
+
+        const vacanteActualizada = await prisma.vacante.update({
+            where: { id: idNumerico },
+            data: {
+                titulo,
+                descripcion,
+                ubicacion,
+                tipo,
+                jornada,
+                modalidad,
+                tipoSalario,
+                salario: salario || null,
+                horario,
+                // Conversión de tipos para Prisma
+                fechaCierre: fechaCierre ? new Date(fechaCierre) : null,
+                limitePostulantes: limitePostulantes ? parseInt(limitePostulantes) : null,
+                estado: estado || undefined // Mantiene el estado actual si no se envía
+            },
+        });
+
+        console.log("✅ Vacante actualizada:", idNumerico);
+        res.json(vacanteActualizada);
+    } catch (error) {
+        console.error("❌ Error al actualizar vacante:", error.message);
+        res.status(500).json({ error: "Error interno al actualizar la vacante." });
+    }
+};
+
 // vacanteController.js
 
 export const listarTodasLasVacantesAdmin = async (req, res) => {

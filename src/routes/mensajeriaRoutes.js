@@ -4,11 +4,15 @@ import { PrismaClient } from '@prisma/client';
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// --- 1. ENVIAR MENSAJE ---
+/**
+ * 1. ENVIAR MENSAJE
+ * Sincronizado con los modelos Egresado y Empresa.
+ */
 router.post('/enviar', async (req, res) => {
-    const { contenido, senderType, senderEmpresaId, receiverId, vacanteId } = req.body;
+    const { contenido, senderType, senderEmpresaId, senderEgresadoId, receiverId, vacanteId } = req.body;
 
-    if (!contenido || !receiverId || !vacanteId) {
+    // Validación de campos según el remitente
+    if (!contenido || !vacanteId || !receiverId) {
         return res.status(400).json({ error: "Faltan campos obligatorios" });
     }
 
@@ -16,21 +20,19 @@ router.post('/enviar', async (req, res) => {
         const nuevoMensaje = await prisma.mensaje.create({
             data: {
                 contenido,
-                senderType, 
-                // receiverId siempre es el Egresado en tu esquema de DB
-                receiverId: parseInt(receiverId),
+                senderType,
                 vacanteId: parseInt(vacanteId),
-                // Si envía la empresa:
+                receiverId: parseInt(receiverId), // En tu DB el receiver siempre es Egresado
                 senderEmpresaId: senderType === 'EMPRESA' ? parseInt(senderEmpresaId) : null,
-                // Si enviara el egresado (para tu referencia futura):
-                senderEgresadoId: senderType === 'USUARIO' ? parseInt(req.body.senderEgresadoId) : null,
+                senderEgresadoId: senderType === 'USUARIO' ? parseInt(senderEgresadoId) : null,
                 
+                // Si envía la empresa, creamos notificación para el egresado
                 ...(senderType === 'EMPRESA' && {
                     notificacion: {
                         create: {
                             tipo: 'MENSAJE_NUEVO',
                             contenido: `La empresa te ha enviado un mensaje`,
-                            egresadoId: parseInt(receiverId) // Cambiado: de usuarioId a egresadoId
+                            egresadoId: parseInt(receiverId)
                         }
                     }
                 })
@@ -38,19 +40,22 @@ router.post('/enviar', async (req, res) => {
         });
         res.status(201).json(nuevoMensaje);
     } catch (error) {
-        console.error("Error en DB:", error.message);
-        res.status(500).json({ error: "No se pudo enviar el mensaje: " + error.message });
+        console.error("Error al enviar mensaje:", error.message);
+        res.status(500).json({ error: "No se pudo enviar el mensaje" });
     }
 });
 
-// --- 2. OBTENER HISTORIAL ---
+/**
+ * 2. OBTENER HISTORIAL
+ * Verifica el estado 'chatActivo' en la tabla Postulacion para bloquear al egresado si es necesario.
+ */
 router.get('/historial/:egresadoId/:empresaId/:vacanteId', async (req, res) => {
     const eId = parseInt(req.params.egresadoId);
     const empId = parseInt(req.params.empresaId);
     const vId = parseInt(req.params.vacanteId);
 
     try {
-        // 1. Buscamos la postulación (Cambiado: de usuarioId a egresadoId)
+        // 1. Validamos si el chat está activo para esta postulación específica
         const postulacion = await prisma.postulacion.findFirst({
             where: { 
                 egresadoId: eId, 
@@ -58,13 +63,13 @@ router.get('/historial/:egresadoId/:empresaId/:vacanteId', async (req, res) => {
             }
         });
 
-        // 2. Buscamos los mensajes (Cambiado: nombres de campos según tu schema.prisma)
+        // 2. Buscamos los mensajes entre ambas partes para esta vacante
         const mensajes = await prisma.mensaje.findMany({
             where: {
                 vacanteId: vId,
                 OR: [
                     { senderEmpresaId: empId, receiverId: eId },
-                    { senderEgresadoId: eId, receiverId: empId } // Nota: tu schema actual solo permite receiver Egresado, ajusta esto si la empresa también recibe.
+                    { senderEgresadoId: eId, receiverId: empId }
                 ]
             },
             orderBy: { fechaEnvio: 'asc' }
@@ -72,32 +77,101 @@ router.get('/historial/:egresadoId/:empresaId/:vacanteId', async (req, res) => {
         
         res.json({
             mensajes: mensajes,
+            // Si la empresa desactivó el chat, enviamos false para que el front bloquee el input
             chatActivo: postulacion ? postulacion.chatActivo : true 
         });
     } catch (error) {
-        console.error(error);
+        console.error("Error al cargar historial:", error.message);
         res.status(500).json({ error: "Error al cargar historial" });
     }
 });
 
-// --- 3. ACTUALIZAR ESTADO DE ACTIVIDAD DEL CHAT ---
+/**
+ * 3. MARCAR COMO LEÍDO
+ */
+router.put('/leer/:egresadoId/:empresaId', async (req, res) => {
+    try {
+        await prisma.mensaje.updateMany({
+            where: {
+                receiverId: parseInt(req.params.egresadoId),
+                senderEmpresaId: parseInt(req.params.empresaId),
+                read: false
+            },
+            data: { read: true }
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: "Error al actualizar lectura" });
+    }
+});
+
+/**
+ * 4. ACTUALIZAR ESTADO DEL CHAT (BLOQUEO)
+ * Este es el endpoint que llama la empresa para cerrar o abrir el chat.
+ */
 router.patch('/status-chat', async (req, res) => {
     const { usuarioId, vacanteId, activo } = req.body;
 
     try {
-        await prisma.postulacion.updateMany({
+        await prisma.postulacion.update({
             where: {
-                egresadoId: parseInt(usuarioId), // Cambiado: de usuarioId a egresadoId
-                vacanteId: parseInt(vacanteId)
+                vacanteId_egresadoId: { // Usamos el ID único compuesto de tu esquema
+                    vacanteId: parseInt(vacanteId),
+                    egresadoId: parseInt(usuarioId)
+                }
             },
             data: { 
                 chatActivo: activo 
             }
         });
         
-        res.json({ success: true, message: "Estado actualizado" });
+        res.json({ 
+            success: true, 
+            message: activo ? "Chat habilitado" : "Chat bloqueado para el postulante" 
+        });
     } catch (error) {
-        res.status(500).json({ error: "No se pudo actualizar en la DB" });
+        console.error("Error al cambiar status chat:", error.message);
+        res.status(500).json({ error: "No se pudo cambiar el estado del chat" });
+    }
+});
+
+/**
+ * 5. MIS CHATS (Para la lista de la izquierda de la empresa)
+ */
+router.get('/mis-chats/:empresaId', async (req, res) => {
+    const empresaId = parseInt(req.params.empresaId);
+
+    try {
+        const conversaciones = await prisma.mensaje.findMany({
+            where: { senderEmpresaId: empresaId },
+            distinct: ['receiverId', 'vacanteId'],
+            include: {
+                receiver: { // Egresado
+                    select: { id: true, nombres: true, apellidos: true }
+                },
+                vacante: {
+                    select: { titulo: true }
+                }
+            },
+            orderBy: { fechaEnvio: 'desc' }
+        });
+
+        // Formateamos para que el front reciba 'usuario' de forma genérica
+        const resultado = conversaciones.map(c => ({
+            usuarioId: c.receiverId,
+            vacanteId: c.vacanteId,
+            usuario: {
+                id: c.receiver.id,
+                nombre: `${c.receiver.nombres} ${c.receiver.apellidos}`
+            },
+            vacante: {
+                titulo: c.vacante.titulo
+            }
+        }));
+
+        res.json(resultado);
+    } catch (error) {
+        res.status(500).json({ error: "Error al obtener lista de chats" });
     }
 });
 

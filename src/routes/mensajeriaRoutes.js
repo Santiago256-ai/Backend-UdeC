@@ -148,10 +148,7 @@ router.get('/mis-chats/empresa/:empresaId', async (req, res) => {
     const empresaId = parseInt(req.params.empresaId);
     try {
         const conversaciones = await prisma.mensaje.findMany({
-            where: {
-                OR: [{ senderEmpresaId: empresaId }, { receiverId: -1 }] // receiverId en tu DB siempre es egresado, así que buscamos por emisor
-            },
-            where: { senderEmpresaId: empresaId },
+            where: { senderEmpresaId: empresaId }, // Solo un 'where'
             distinct: ['receiverId', 'vacanteId'],
             include: {
                 receiver: { select: { id: true, nombres: true, apellidos: true } },

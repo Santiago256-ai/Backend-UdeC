@@ -138,15 +138,16 @@ router.put('/status-chat', async (req, res) => {
 /**
  * 5. MIS CHATS (Para la lista de la izquierda de la empresa)
  */
+// --- ACTUALIZAR EN EL BACKEND ---
+// Cambiamos el nombre para que coincida con el frontend
 router.get('/mis-chats/:empresaId', async (req, res) => {
     const empresaId = parseInt(req.params.empresaId);
-
     try {
         const conversaciones = await prisma.mensaje.findMany({
             where: { senderEmpresaId: empresaId },
             distinct: ['receiverId', 'vacanteId'],
             include: {
-                receiver: { // Egresado
+                receiver: { // El Egresado
                     select: { id: true, nombres: true, apellidos: true }
                 },
                 vacante: {
@@ -156,7 +157,6 @@ router.get('/mis-chats/:empresaId', async (req, res) => {
             orderBy: { fechaEnvio: 'desc' }
         });
 
-        // Formateamos para que el front reciba 'usuario' de forma genérica
         const resultado = conversaciones.map(c => ({
             usuarioId: c.receiverId,
             vacanteId: c.vacanteId,
@@ -164,9 +164,7 @@ router.get('/mis-chats/:empresaId', async (req, res) => {
                 id: c.receiver.id,
                 nombre: `${c.receiver.nombres} ${c.receiver.apellidos}`
             },
-            vacante: {
-                titulo: c.vacante.titulo
-            }
+            vacante: { titulo: c.vacante.titulo }
         }));
 
         res.json(resultado);

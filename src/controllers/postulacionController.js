@@ -199,14 +199,16 @@ export const actualizarAnclajePostulacion = async (req, res) => {
     const { id } = req.params;
     const { anclado } = req.body;
 
+    console.log(`Intentando anclaje - ID: ${id}, Valor: ${anclado}`); // <--- MIRA ESTO EN TU TERMINAL
+
     try {
         const postulacionActualizada = await prisma.postulacion.update({
             where: { id: parseInt(id) },
-            data: { anclado: anclado }
+            data: { anclado: Boolean(anclado) } // Forzamos que sea Booleano
         });
         res.json(postulacionActualizada);
     } catch (error) {
-        console.error("Error al anclar:", error);
+        console.error("Error detallado de Prisma:", error);
         res.status(500).json({ error: "No se pudo actualizar el anclaje" });
     }
 };

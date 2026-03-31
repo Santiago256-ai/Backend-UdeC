@@ -4,11 +4,11 @@ import { PrismaClient } from '@prisma/client';
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// --- 1. ENVIAR MENSAJE (Corregido para incluir vacanteId) ---
+// --- 1. ENVIAR MENSAJE ---
 router.post('/enviar', async (req, res) => {
-    const { contenido, senderType, senderId, receiverId, vacanteId } = req.body;
+    const { contenido, senderType, senderEmpresaId, receiverId, vacanteId } = req.body;
 
-    if (!contenido || !senderId || !receiverId || !vacanteId) {
+    if (!contenido || !receiverId || !vacanteId) {
         return res.status(400).json({ error: "Faltan campos obligatorios" });
     }
 
@@ -17,16 +17,20 @@ router.post('/enviar', async (req, res) => {
             data: {
                 contenido,
                 senderType, 
+                // receiverId siempre es el Egresado en tu esquema de DB
                 receiverId: parseInt(receiverId),
-                vacanteId: parseInt(vacanteId), // ✅ Ahora se guarda el ID de la vacante
-                senderEmpresaId: senderType === 'EMPRESA' ? parseInt(senderId) : null,
-                senderUsuarioId: senderType === 'USUARIO' ? parseInt(senderId) : null,
+                vacanteId: parseInt(vacanteId),
+                // Si envía la empresa:
+                senderEmpresaId: senderType === 'EMPRESA' ? parseInt(senderEmpresaId) : null,
+                // Si enviara el egresado (para tu referencia futura):
+                senderEgresadoId: senderType === 'USUARIO' ? parseInt(req.body.senderEgresadoId) : null,
+                
                 ...(senderType === 'EMPRESA' && {
                     notificacion: {
                         create: {
                             tipo: 'MENSAJE_NUEVO',
                             contenido: `La empresa te ha enviado un mensaje`,
-                            usuarioId: parseInt(receiverId)
+                            egresadoId: parseInt(receiverId) // Cambiado: de usuarioId a egresadoId
                         }
                     }
                 })
@@ -35,31 +39,32 @@ router.post('/enviar', async (req, res) => {
         res.status(201).json(nuevoMensaje);
     } catch (error) {
         console.error("Error en DB:", error.message);
-        res.status(500).json({ error: "No se pudo enviar el mensaje" });
+        res.status(500).json({ error: "No se pudo enviar el mensaje: " + error.message });
     }
 });
 
 // --- 2. OBTENER HISTORIAL ---
-router.get('/historial/:usuarioId/:empresaId/:vacanteId', async (req, res) => {
-    const uId = parseInt(req.params.usuarioId);
+router.get('/historial/:egresadoId/:empresaId/:vacanteId', async (req, res) => {
+    const eId = parseInt(req.params.egresadoId);
+    const empId = parseInt(req.params.empresaId);
     const vId = parseInt(req.params.vacanteId);
 
     try {
-        // 1. Buscamos la postulación para ver el estado real de 'chatActivo'
+        // 1. Buscamos la postulación (Cambiado: de usuarioId a egresadoId)
         const postulacion = await prisma.postulacion.findFirst({
             where: { 
-                usuarioId: uId, 
+                egresadoId: eId, 
                 vacanteId: vId 
             }
         });
 
-        // 2. Buscamos los mensajes
+        // 2. Buscamos los mensajes (Cambiado: nombres de campos según tu schema.prisma)
         const mensajes = await prisma.mensaje.findMany({
             where: {
                 vacanteId: vId,
                 OR: [
-                    { senderEmpresaId: parseInt(req.params.empresaId), receiverId: uId },
-                    { senderUsuarioId: uId, receiverId: parseInt(req.params.empresaId) }
+                    { senderEmpresaId: empId, receiverId: eId },
+                    { senderEgresadoId: eId, receiverId: empId } // Nota: tu schema actual solo permite receiver Egresado, ajusta esto si la empresa también recibe.
                 ]
             },
             orderBy: { fechaEnvio: 'asc' }
@@ -67,77 +72,22 @@ router.get('/historial/:usuarioId/:empresaId/:vacanteId', async (req, res) => {
         
         res.json({
             mensajes: mensajes,
-            // Si no encuentra la postulación por alguna razón, por defecto es true
             chatActivo: postulacion ? postulacion.chatActivo : true 
         });
     } catch (error) {
+        console.error(error);
         res.status(500).json({ error: "Error al cargar historial" });
     }
 });
 
-// --- 3. MARCAR COMO LEÍDO (Nueva: evita el error 404 de la consola) ---
-router.put('/leer/:usuarioId/:empresaId', async (req, res) => {
-    try {
-        await prisma.mensaje.updateMany({
-            where: {
-                receiverId: parseInt(req.params.usuarioId),
-                senderEmpresaId: parseInt(req.params.empresaId),
-                read: false
-            },
-            data: { read: true }
-        });
-        res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: "Error al actualizar lectura" });
-    }
-});
-
-// --- 4. LISTA DE CONVERSACIONES (Corregida con JOINs para traer nombres) ---
-router.get('/mis-conversaciones/:usuarioId', async (req, res) => {
-    const usuarioId = parseInt(req.params.usuarioId);
-
-    try {
-        // Esta consulta busca mensajes únicos agrupados por vacante y empresa
-        const mensajes = await prisma.mensaje.findMany({
-            where: {
-                OR: [
-                    { senderUsuarioId: usuarioId },
-                    { receiverId: usuarioId }
-                ]
-            },
-            include: {
-                vacante: { select: { titulo: true } },
-                senderEmpresa: { select: { nombre: true } }
-            },
-            orderBy: { fechaEnvio: 'desc' },
-            distinct: ['vacanteId'] // Trae solo el último mensaje de cada vacante diferente
-        });
-
-        // Formateamos la respuesta para que el Frontend la entienda
-        const formateado = mensajes.map(m => ({
-            vacanteId: m.vacanteId,
-            empresaId: m.senderEmpresaId || m.receiverId,
-            tituloVacante: m.vacante?.titulo || "Vacante",
-            nombreEmpresa: m.senderEmpresa?.nombre || "Empresa",
-            ultimoMensaje: m.contenido
-        }));
-        
-        res.json(formateado);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Error al obtener conversaciones" });
-    }
-});
-
-// --- 5. ACTUALIZAR ESTADO DE ACTIVIDAD DEL CHAT ---
+// --- 3. ACTUALIZAR ESTADO DE ACTIVIDAD DEL CHAT ---
 router.patch('/status-chat', async (req, res) => {
     const { usuarioId, vacanteId, activo } = req.body;
 
     try {
-        // Actualizamos el campo 'chatActivo' en la tabla Postulacion
         await prisma.postulacion.updateMany({
             where: {
-                usuarioId: parseInt(usuarioId),
+                egresadoId: parseInt(usuarioId), // Cambiado: de usuarioId a egresadoId
                 vacanteId: parseInt(vacanteId)
             },
             data: { 
@@ -145,10 +95,9 @@ router.patch('/status-chat', async (req, res) => {
             }
         });
         
-        res.json({ success: true, message: "Estado actualizado en la base de datos" });
+        res.json({ success: true, message: "Estado actualizado" });
     } catch (error) {
-        console.error("Error al actualizar status:", error);
-        res.status(500).json({ error: "No se pudo actualizar el estado en la DB" });
+        res.status(500).json({ error: "No se pudo actualizar en la DB" });
     }
 });
 

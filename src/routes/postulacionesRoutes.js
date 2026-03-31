@@ -28,10 +28,6 @@ const upload = multer({
 router.get("/vacante/:vacanteId", obtenerPostulacionesPorVacante);
 router.post("/enviar", crearPostulacion);
 
-router.use("/:id/anclaje", (req, res, next) => {
-    console.log("📬 BACKEND: Petición recibida en ruta ANCLAJE para ID:", req.params.id);
-    next();
-});
 // 2. NUEVA RUTA: Actualizar solo el anclaje
 router.put("/:id/anclaje", actualizarAnclajePostulacion); 
 

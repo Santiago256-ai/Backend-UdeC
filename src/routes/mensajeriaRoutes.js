@@ -140,19 +140,22 @@ router.put('/status-chat', async (req, res) => {
  */
 // --- ACTUALIZAR EN EL BACKEND ---
 // Cambiamos el nombre para que coincida con el frontend
-router.get('/mis-chats/:empresaId', async (req, res) => {
+/**
+ * 5. MIS CHATS (Vista Empresa)
+ * Muestra los egresados con los que la empresa ha hablado.
+ */
+router.get('/mis-chats/empresa/:empresaId', async (req, res) => {
     const empresaId = parseInt(req.params.empresaId);
     try {
         const conversaciones = await prisma.mensaje.findMany({
+            where: {
+                OR: [{ senderEmpresaId: empresaId }, { receiverId: -1 }] // receiverId en tu DB siempre es egresado, así que buscamos por emisor
+            },
             where: { senderEmpresaId: empresaId },
             distinct: ['receiverId', 'vacanteId'],
             include: {
-                receiver: { // El Egresado
-                    select: { id: true, nombres: true, apellidos: true }
-                },
-                vacante: {
-                    select: { titulo: true }
-                }
+                receiver: { select: { id: true, nombres: true, apellidos: true } },
+                vacante: { select: { titulo: true } }
             },
             orderBy: { fechaEnvio: 'desc' }
         });
@@ -164,12 +167,49 @@ router.get('/mis-chats/:empresaId', async (req, res) => {
                 id: c.receiver.id,
                 nombre: `${c.receiver.nombres} ${c.receiver.apellidos}`
             },
-            vacante: { titulo: c.vacante.titulo }
+            vacante: { titulo: c.vacante.titulo },
+            ultimoMensaje: c.contenido
+        }));
+        res.json(resultado);
+    } catch (error) {
+        res.status(500).json({ error: "Error al obtener chats de empresa" });
+    }
+});
+
+/**
+ * 6. MIS CHATS (Vista Egresado/Estudiante)
+ * Muestra las empresas con las que el estudiante tiene chats.
+ */
+router.get('/mis-chats/egresado/:egresadoId', async (req, res) => {
+    const eId = parseInt(req.params.egresadoId);
+    try {
+        const conversaciones = await prisma.mensaje.findMany({
+            where: {
+                OR: [
+                    { receiverId: eId },
+                    { senderEgresadoId: eId }
+                ]
+            },
+            distinct: ['vacanteId'],
+            include: {
+                senderEmpresa: { select: { id: true, nombre: true } },
+                vacante: { select: { titulo: true } }
+            },
+            orderBy: { fechaEnvio: 'desc' }
+        });
+
+        const resultado = conversaciones.map(c => ({
+            vacanteId: c.vacanteId,
+            empresaId: c.senderEmpresaId || c.vacante?.empresaId, 
+            nombreEmpresa: c.senderEmpresa?.nombre || "Empresa Aliada",
+            tituloVacante: c.vacante?.titulo || "Vacante",
+            ultimoMensaje: c.contenido
         }));
 
         res.json(resultado);
     } catch (error) {
-        res.status(500).json({ error: "Error al obtener lista de chats" });
+        console.error(error);
+        res.status(500).json({ error: "Error al obtener chats del egresado" });
     }
 });
 

@@ -109,7 +109,7 @@ router.put('/leer/:egresadoId/:empresaId', async (req, res) => {
  * 4. ACTUALIZAR ESTADO DEL CHAT (BLOQUEO)
  * Este es el endpoint que llama la empresa para cerrar o abrir el chat.
  */
-router.patch('/status-chat', async (req, res) => {
+router.put('/status-chat', async (req, res) => {
     const { usuarioId, vacanteId, activo } = req.body;
 
     try {

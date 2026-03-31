@@ -199,8 +199,7 @@ export const actualizarAnclajePostulacion = async (req, res) => {
     const { id } = req.params;
     const { anclado } = req.body;
 
-    console.log(`Intentando anclaje - ID: ${id}, Valor: ${anclado}`); // <--- MIRA ESTO EN TU TERMINAL
-
+console.log(`🤖 BACKEND CONTROLADOR: ID=${id}, anclado (recibido)=${anclado}, tipo=${typeof anclado}`);
     try {
         const postulacionActualizada = await prisma.postulacion.update({
             where: { id: parseInt(id) },

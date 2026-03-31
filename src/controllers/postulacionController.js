@@ -36,6 +36,7 @@ export const crearPostulacion = async (req, res) => {
         vacanteId: vId,
         egresadoId: uId,
         estado: "PENDIENTE", 
+        anclado: false,
         // Ya no enviamos cv_url porque el Admin verá el PerfilCV vinculado al egresadoId
       },
       include: { egresado: true }
@@ -189,5 +190,23 @@ export const obtenerTodasLasPostulacionesAdmin = async (req, res) => {
     } catch (error) {
         console.error("❌ Error al obtener todas las postulaciones:", error.message);
         res.status(500).json({ error: "Error interno del servidor" });
+    }
+};
+
+// En controllers/postulacionController.js
+
+export const actualizarAnclajePostulacion = async (req, res) => {
+    const { id } = req.params;
+    const { anclado } = req.body;
+
+    try {
+        const postulacionActualizada = await prisma.postulacion.update({
+            where: { id: parseInt(id) },
+            data: { anclado: anclado }
+        });
+        res.json(postulacionActualizada);
+    } catch (error) {
+        console.error("Error al anclar:", error);
+        res.status(500).json({ error: "No se pudo actualizar el anclaje" });
     }
 };

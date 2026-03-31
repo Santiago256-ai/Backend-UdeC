@@ -137,6 +137,7 @@ model Postulacion {
   id         Int      @id @default(autoincrement())
   telefono   String?
   estado     String   @default("PENDIENTE")
+  anclado    Boolean  @default(false)
   chatActivo Boolean  @default(true)
   fecha      DateTime @default(now())
   vacanteId  Int

@@ -4,21 +4,17 @@ import {
     crearPostulacion, 
     obtenerPostulacionesPorVacante,
     actualizarEstadoPostulacion,
+    actualizarAnclajePostulacion, // 1. IMPORTA LA NUEVA FUNCIÓN
     obtenerDetallePostulacionesAdmin,
     obtenerTodasLasPostulacionesAdmin
 } from "../controllers/postulacionController.js"; 
 
 const router = express.Router();
 
-// ✅ CORRECCIÓN PARA VERCEL: Usar memoria en lugar de disco
-// Esto evita intentar escribir en '/var/task/src/uploads/', que está bloqueado
 const storage = multer.memoryStorage();
-
 const upload = multer({
   storage,
-  limits: { 
-    fileSize: 5 * 1024 * 1024 // Límite de 5MB para evitar sobrecargar la memoria
-  },
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype !== "application/pdf") {
       return cb(new Error("Solo se permiten archivos PDF"), false);
@@ -29,15 +25,16 @@ const upload = multer({
 
 // --- RUTAS DE POSTULACIÓN ---
 
-// 1. GET: Obtener postulaciones por ID de Vacante
 router.get("/vacante/:vacanteId", obtenerPostulacionesPorVacante);
-
 router.post("/enviar", crearPostulacion);
 
-// 3. PATCH: Actualizar el estado de una postulación
+// 2. NUEVA RUTA: Actualizar solo el anclaje
+router.put("/:id/anclaje", actualizarAnclajePostulacion); 
+
+// 3. PUT: Actualizar el estado de una postulación
 router.put("/:id/estado", actualizarEstadoPostulacion);
 
-//Perfil administrador
+// Perfil administrador
 router.get("/admin/detalle-completo/:vacanteId", obtenerDetallePostulacionesAdmin);
 router.get("/admin/todas", obtenerTodasLasPostulacionesAdmin);
 

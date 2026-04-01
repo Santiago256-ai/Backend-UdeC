@@ -217,8 +217,8 @@ export const eliminarEmpresaAdmin = async (req, res) => {
 // Actualizar datos de la empresa
 export const actualizarEmpresa = async (req, res) => {
     try {
-        const { id } = req.params; // Obtenemos el ID de la URL
-        const data = req.body;     // Obtenemos los campos enviados desde el frontend
+        const { id } = req.params;
+        const data = req.body;
 
         // 1. Verificar que la empresa exista
         const empresaExistente = await prisma.empresa.findUnique({
@@ -230,20 +230,27 @@ export const actualizarEmpresa = async (req, res) => {
         }
 
         // 2. Limpiar y transformar datos sensibles o tipos de datos
-        // Si viene foundationYear, asegurar que sea un entero
         if (data.foundationYear) {
             data.foundationYear = parseInt(data.foundationYear);
         }
 
-        // Evitar que el email se cambie si ya existe en otra empresa (opcional)
-        // O simplemente quitar el email del objeto data para que no sea editable
+        // --- 🟢 AJUSTE PARA CAMPOS String[] (Arreglos) ---
+        // Si el frontend envía estos campos, usamos { set: ... } para que Prisma los actualice bien
+        if (data.economicSector) {
+            data.economicSector = { set: data.economicSector };
+        }
+        if (data.distributionChannels) {
+            data.distributionChannels = { set: data.distributionChannels };
+        }
+
+        // Seguridad: Evitar que modifiquen email o password por esta ruta
         delete data.email; 
-        delete data.password; // La contraseña se debería manejar en otra función por seguridad
+        delete data.password; 
 
         // 3. Actualizar en la base de datos
         const empresaActualizada = await prisma.empresa.update({
             where: { id: parseInt(id) },
-            data: data
+            data: data // 'data' ya lleva los ajustes de arriba
         });
 
         // 4. Quitar la contraseña de la respuesta

@@ -150,69 +150,82 @@ router.put('/status-chat', async (req, res) => {
 /**
  * 5. MIS CHATS (Para la lista de la izquierda de la empresa)
  */
-// --- ACTUALIZAR EN EL BACKEND ---
-// Cambiamos el nombre para que coincida con el frontend
 /**
- * 5. MIS CHATS (Vista Empresa)
- * Muestra los egresados con los que la empresa ha hablado.
- */
-/**
- * 5. MIS CHATS (Vista Empresa) - ACTUALIZADO CON CONTADOR
+ * 5. MIS CHATS (Vista Empresa) - CORREGIDO (Sin duplicados)
  */
 router.get('/mis-chats/empresa/:empresaId', async (req, res) => {
     const empresaId = parseInt(req.params.empresaId);
     try {
-        // 1. Obtenemos las conversaciones base
-        const conversaciones = await prisma.mensaje.findMany({
-            where: { 
-                OR: [
-                    { senderEmpresaId: empresaId },
-                    { receiverId: empresaId } // Por si el egresado inició el chat
-                ]
+        // En lugar de buscar mensajes, buscamos postulaciones de la empresa
+        // que tengan al menos un mensaje (así sabemos que hay chat)
+        const postulaciones = await prisma.postulacion.findMany({
+            where: {
+                vacante: { empresaId: empresaId },
+                vacante: {
+                    mensajes: { some: {} } // Solo postulaciones con chat
+                }
             },
-            distinct: ['vacanteId', 'senderEgresadoId', 'receiverId'], 
             include: {
-                receiver: { select: { id: true, nombres: true, apellidos: true } },
-                senderEgresado: { select: { id: true, nombres: true, apellidos: true } },
-                vacante: { select: { titulo: true } }
-            },
-            orderBy: { fechaEnvio: 'desc' }
+                egresado: { select: { id: true, nombres: true, apellidos: true } },
+                vacante: { select: { id: true, titulo: true } },
+                // Traemos el último mensaje para mostrarlo y ordenar
+                vacante: {
+                    include: {
+                        mensajes: {
+                            orderBy: { fechaEnvio: 'desc' },
+                            take: 1
+                        }
+                    }
+                }
+            }
         });
 
-        // 2. Para cada conversación, contamos cuántos mensajes NO ha leído la empresa
-        const resultado = await Promise.all(conversaciones.map(async (c) => {
-            // Determinamos quién es el egresado en esta conversación
-            const esRemitenteEgresado = c.senderEgresadoId !== null;
-            const egresadoId = esRemitenteEgresado ? c.senderEgresadoId : c.receiverId;
-            const egresadoData = esRemitenteEgresado ? c.senderEgresado : c.receiver;
-
-            // CONTADOR DE PENDIENTES: Mensajes donde el receptor es la empresa y read es false
+        const resultado = await Promise.all(postulaciones.map(async (p) => {
+            const egresadoId = p.egresadoId;
+            
+            // CONTADOR DE PENDIENTES (Sigue igual, esto funciona bien)
             const pendientes = await prisma.mensaje.count({
                 where: {
-                    vacanteId: c.vacanteId,
+                    vacanteId: p.vacanteId,
                     senderEgresadoId: egresadoId,
                     receiverId: empresaId,
                     read: false
                 }
             });
 
+            // Buscamos el último mensaje específico de este chat
+            const ultimoMsg = await prisma.mensaje.findFirst({
+                where: {
+                    vacanteId: p.vacanteId,
+                    OR: [
+                        { senderEgresadoId: egresadoId, receiverId: empresaId },
+                        { senderEmpresaId: empresaId, receiverId: egresadoId }
+                    ]
+                },
+                orderBy: { fechaEnvio: 'desc' }
+            });
+
             return {
                 usuarioId: egresadoId,
-                vacanteId: c.vacanteId,
+                vacanteId: p.vacanteId,
                 usuario: {
                     id: egresadoId,
-                    nombre: `${egresadoData.nombres} ${egresadoData.apellidos}`
+                    nombre: `${p.egresado.nombres} ${p.egresado.apellidos}`
                 },
-                vacante: { titulo: c.vacante.titulo },
-                ultimoMensaje: c.contenido,
-                pendientes: pendientes // <--- ¡AQUÍ ESTÁ LA MAGIA!
+                vacante: { titulo: p.vacante.titulo },
+                ultimoMensaje: ultimoMsg?.contenido || "",
+                fechaUltimo: ultimoMsg?.fechaEnvio || p.fecha,
+                pendientes: pendientes
             };
         }));
 
+        // Ordenamos para que el chat con el mensaje más reciente salga arriba
+        resultado.sort((a, b) => new Date(b.fechaUltimo) - new Date(a.fechaUltimo));
+
         res.json(resultado);
     } catch (error) {
-        console.error("Error:", error);
-        res.status(500).json({ error: "Error al obtener chats de empresa" });
+        console.error("Error al obtener chats:", error);
+        res.status(500).json({ error: "Error al obtener chats" });
     }
 });
 

@@ -107,46 +107,54 @@ if (!companyName || !email || !phones || !contactName || !address || !city || !d
 // 🔐 NUEVA FUNCIÓN: Iniciar sesión de la empresa
 export const loginEmpresa = async (req, res) => {
     try {
+        // 1. Extraemos los datos del body
         const { identificador, contraseña: password } = req.body; 
+
+        // 2. Validamos que existan antes de transformar
+        if (!identificador || !password) {
+            return res.status(400).json({ error: "Faltan credenciales (email y password)." });
+        }
+
+        // 3. Ahora sí, normalizamos usando 'identificador'
         const correoABuscar = identificador.toLowerCase().trim();
 
-        // 1. Buscamos la empresa
+        // 1. Buscar la empresa por email
         const empresa = await prisma.empresa.findUnique({
             where: { email: correoABuscar },
-            // 🚩 IMPORTANTE: Asegúrate de NO tener un bloque 'select' aquí 
-            // que limite los campos. Si no hay 'select', Prisma trae TODO.
         });
 
         if (!empresa) {
             return res.status(401).json({ error: "Credenciales incorrectas." });
         }
 
+        // 2. Comparar la contraseña ingresada con el hash guardado
         const passwordMatch = await bcrypt.compare(password, empresa.password);
+
         if (!passwordMatch) {
             return res.status(401).json({ error: "Credenciales incorrectas." });
         }
 
+        // 3. Generar el Token Web JSON (JWT)
         const token = jwt.sign(
-            { id: empresa.id, email: empresa.email, rol: 'empresa' },
+            { id: empresa.id, email: empresa.email, rol: 'empresa' }, // Payload
             JWT_SECRET,
             { expiresIn: '1d' } 
         );
 
-        // 2. 🚩 LA CLAVE ESTÁ AQUÍ: 
-        // Extraemos el password para no enviarlo, pero enviamos TODO lo demás
-        const { password: _, ...empresaCompleta } = empresa;
+        // 4. Devolver respuesta exitosa (sin el hash de la contraseña)
+        const { password: _, ...empresaData } = empresa;
 
         res.status(200).json({
             message: "Inicio de sesión exitoso",
             token,
             usuario: { 
-                ...empresaCompleta, // 👈 Esto enviará nit, address, phones, city, etc.
-                rol: 'empresa' 
+                ...empresaData,
+                rol: 'empresa' // ⬅️ CLAVE: Devuelve el rol para que el frontend pueda redireccionar
             }
         });
 
     } catch (error) {
-        console.error(error);
+        console.error("❌ Error al iniciar sesión de empresa:", error);
         res.status(500).json({ error: "Error interno del servidor." });
     }
 };
@@ -203,59 +211,5 @@ export const eliminarEmpresaAdmin = async (req, res) => {
         res.json({ message: "Empresa eliminada correctamente" });
     } catch (error) {
         res.status(500).json({ error: "Error al eliminar. Verifique si la empresa tiene vacantes activas." });
-    }
-};
-
-// Actualizar datos de la empresa
-export const actualizarEmpresa = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const data = req.body;
-
-        // 1. Verificar que la empresa exista
-        const empresaExistente = await prisma.empresa.findUnique({
-            where: { id: parseInt(id) }
-        });
-
-        if (!empresaExistente) {
-            return res.status(404).json({ error: "Empresa no encontrada" });
-        }
-
-        // 2. Limpiar y transformar datos sensibles o tipos de datos
-        if (data.foundationYear) {
-            data.foundationYear = parseInt(data.foundationYear);
-        }
-
-        // --- 🟢 AJUSTE PARA CAMPOS String[] (Arreglos) ---
-        // Si el frontend envía estos campos, usamos { set: ... } para que Prisma los actualice bien
-        if (data.economicSector) {
-            data.economicSector = { set: data.economicSector };
-        }
-        if (data.distributionChannels) {
-            data.distributionChannels = { set: data.distributionChannels };
-        }
-
-        // Seguridad: Evitar que modifiquen email o password por esta ruta
-        delete data.email; 
-        delete data.password; 
-
-        // 3. Actualizar en la base de datos
-        const empresaActualizada = await prisma.empresa.update({
-            where: { id: parseInt(id) },
-            data: data // 'data' ya lleva los ajustes de arriba
-        });
-
-        // 4. Quitar la contraseña de la respuesta
-        const { password: _, ...empresaData } = empresaActualizada;
-
-        console.log(`✅ Empresa ID ${id} actualizada con éxito`);
-        res.json(empresaData);
-
-    } catch (error) {
-        console.error("❌ Error al actualizar empresa:", error);
-        if (error.code === 'P2002') {
-            return res.status(409).json({ error: "El NIT ya está registrado por otra empresa." });
-        }
-        res.status(500).json({ error: "Error interno al actualizar los datos corporativos." });
     }
 };

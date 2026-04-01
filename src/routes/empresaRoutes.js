@@ -4,7 +4,7 @@ import {
     listarEmpresas, 
     loginEmpresa,
     obtenerEmpresasParaAdmin,
-    eliminarEmpresaAdmin, actualizarEmpresa
+    eliminarEmpresaAdmin 
 } from "../controllers/empresaController.js";
 
 const router = Router();
@@ -24,6 +24,5 @@ router.post("/login", loginEmpresa);
 // 🚀 NUEVO: Flujo exclusivo para el Administrador
 router.get("/admin/todas", obtenerEmpresasParaAdmin);
 router.delete("/admin/:id", eliminarEmpresaAdmin);
-router.put("/:id", actualizarEmpresa);
 
 export default router;

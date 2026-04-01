@@ -55,6 +55,7 @@ router.get('/historial/:egresadoId/:empresaId/:vacanteId', async (req, res) => {
     const vId = parseInt(req.params.vacanteId);
 
     try {
+        /* COMENTA O ELIMINA ESTO:
         await prisma.mensaje.updateMany({
             where: {
                 vacanteId: vId,
@@ -64,6 +65,7 @@ router.get('/historial/:egresadoId/:empresaId/:vacanteId', async (req, res) => {
             },
             data: { read: true }
         });
+        */
         // 1. Validamos si el chat está activo para esta postulación específica
         const postulacion = await prisma.postulacion.findFirst({
             where: { 

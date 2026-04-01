@@ -55,6 +55,15 @@ router.get('/historial/:egresadoId/:empresaId/:vacanteId', async (req, res) => {
     const vId = parseInt(req.params.vacanteId);
 
     try {
+        await prisma.mensaje.updateMany({
+            where: {
+                vacanteId: vId,
+                senderEgresadoId: eId,
+                receiverId: empId,
+                read: false
+            },
+            data: { read: true }
+        });
         // 1. Validamos si el chat está activo para esta postulación específica
         const postulacion = await prisma.postulacion.findFirst({
             where: { 
@@ -87,20 +96,23 @@ router.get('/historial/:egresadoId/:empresaId/:vacanteId', async (req, res) => {
 });
 
 /**
- * 3. MARCAR COMO LEÍDO
+ * 3. MARCAR COMO LEÍDO (Versión Empresa)
  */
-router.put('/leer/:egresadoId/:empresaId', async (req, res) => {
+router.put('/leer-mensajes', async (req, res) => {
+    const { egresadoId, empresaId, vacanteId } = req.body; // Recibimos datos por el body
     try {
         await prisma.mensaje.updateMany({
             where: {
-                receiverId: parseInt(req.params.egresadoId),
-                senderEmpresaId: parseInt(req.params.empresaId),
+                vacanteId: parseInt(vacanteId),
+                senderEgresadoId: parseInt(egresadoId), // Mensajes del estudiante
+                receiverId: parseInt(empresaId),        // Recibidos por la empresa
                 read: false
             },
             data: { read: true }
         });
         res.json({ success: true });
     } catch (error) {
+        console.error("Error al marcar lectura:", error);
         res.status(500).json({ error: "Error al actualizar lectura" });
     }
 });
@@ -144,31 +156,62 @@ router.put('/status-chat', async (req, res) => {
  * 5. MIS CHATS (Vista Empresa)
  * Muestra los egresados con los que la empresa ha hablado.
  */
+/**
+ * 5. MIS CHATS (Vista Empresa) - ACTUALIZADO CON CONTADOR
+ */
 router.get('/mis-chats/empresa/:empresaId', async (req, res) => {
     const empresaId = parseInt(req.params.empresaId);
     try {
+        // 1. Obtenemos las conversaciones base
         const conversaciones = await prisma.mensaje.findMany({
-            where: { senderEmpresaId: empresaId }, // Solo un 'where'
-            distinct: ['receiverId', 'vacanteId'],
+            where: { 
+                OR: [
+                    { senderEmpresaId: empresaId },
+                    { receiverId: empresaId } // Por si el egresado inició el chat
+                ]
+            },
+            distinct: ['vacanteId', 'senderEgresadoId', 'receiverId'], 
             include: {
                 receiver: { select: { id: true, nombres: true, apellidos: true } },
+                senderEgresado: { select: { id: true, nombres: true, apellidos: true } },
                 vacante: { select: { titulo: true } }
             },
             orderBy: { fechaEnvio: 'desc' }
         });
 
-        const resultado = conversaciones.map(c => ({
-            usuarioId: c.receiverId,
-            vacanteId: c.vacanteId,
-            usuario: {
-                id: c.receiver.id,
-                nombre: `${c.receiver.nombres} ${c.receiver.apellidos}`
-            },
-            vacante: { titulo: c.vacante.titulo },
-            ultimoMensaje: c.contenido
+        // 2. Para cada conversación, contamos cuántos mensajes NO ha leído la empresa
+        const resultado = await Promise.all(conversaciones.map(async (c) => {
+            // Determinamos quién es el egresado en esta conversación
+            const esRemitenteEgresado = c.senderEgresadoId !== null;
+            const egresadoId = esRemitenteEgresado ? c.senderEgresadoId : c.receiverId;
+            const egresadoData = esRemitenteEgresado ? c.senderEgresado : c.receiver;
+
+            // CONTADOR DE PENDIENTES: Mensajes donde el receptor es la empresa y read es false
+            const pendientes = await prisma.mensaje.count({
+                where: {
+                    vacanteId: c.vacanteId,
+                    senderEgresadoId: egresadoId,
+                    receiverId: empresaId,
+                    read: false
+                }
+            });
+
+            return {
+                usuarioId: egresadoId,
+                vacanteId: c.vacanteId,
+                usuario: {
+                    id: egresadoId,
+                    nombre: `${egresadoData.nombres} ${egresadoData.apellidos}`
+                },
+                vacante: { titulo: c.vacante.titulo },
+                ultimoMensaje: c.contenido,
+                pendientes: pendientes // <--- ¡AQUÍ ESTÁ LA MAGIA!
+            };
         }));
+
         res.json(resultado);
     } catch (error) {
+        console.error("Error:", error);
         res.status(500).json({ error: "Error al obtener chats de empresa" });
     }
 });

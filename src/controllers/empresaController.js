@@ -110,13 +110,19 @@ export const loginEmpresa = async (req, res) => {
         const { identificador, contraseña: password } = req.body; 
         const correoABuscar = identificador.toLowerCase().trim();
 
+        // 1. Buscamos la empresa
         const empresa = await prisma.empresa.findUnique({
             where: { email: correoABuscar },
-            // 💡 No necesitamos poner 'select' si queremos todos los campos, 
-            // Prisma por defecto trae todo el modelo Empresa.
+            // 🚩 IMPORTANTE: Asegúrate de NO tener un bloque 'select' aquí 
+            // que limite los campos. Si no hay 'select', Prisma trae TODO.
         });
 
-        if (!empresa || !(await bcrypt.compare(password, empresa.password))) {
+        if (!empresa) {
+            return res.status(401).json({ error: "Credenciales incorrectas." });
+        }
+
+        const passwordMatch = await bcrypt.compare(password, empresa.password);
+        if (!passwordMatch) {
             return res.status(401).json({ error: "Credenciales incorrectas." });
         }
 
@@ -126,19 +132,21 @@ export const loginEmpresa = async (req, res) => {
             { expiresIn: '1d' } 
         );
 
-        // 🔐 Quitamos la contraseña antes de enviar
-        const { password: _, ...empresaData } = empresa;
+        // 2. 🚩 LA CLAVE ESTÁ AQUÍ: 
+        // Extraemos el password para no enviarlo, pero enviamos TODO lo demás
+        const { password: _, ...empresaCompleta } = empresa;
 
         res.status(200).json({
             message: "Inicio de sesión exitoso",
             token,
             usuario: { 
-                ...empresaData, // 👈 Esto ahora enviará NIT, address, phones, city, etc.
+                ...empresaCompleta, // 👈 Esto enviará nit, address, phones, city, etc.
                 rol: 'empresa' 
             }
         });
 
     } catch (error) {
+        console.error(error);
         res.status(500).json({ error: "Error interno del servidor." });
     }
 };

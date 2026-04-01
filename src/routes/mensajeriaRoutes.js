@@ -254,12 +254,13 @@ router.get('/mis-chats/egresado/:egresadoId', async (req, res) => {
         });
 
         const resultado = conversaciones.map(c => ({
-            vacanteId: c.vacanteId,
-            empresaId: c.senderEmpresaId || c.vacante?.empresaId, 
-            nombreEmpresa: c.senderEmpresa?.nombre || "Empresa Aliada",
-            tituloVacante: c.vacante?.titulo || "Vacante",
-            ultimoMensaje: c.contenido
-        }));
+    vacanteId: c.vacanteId,
+    // ¡ESTA LÍNEA ES LA MÁS IMPORTANTE!
+    empresaId: c.senderEmpresaId || c.vacante?.empresaId, 
+    nombreEmpresa: c.senderEmpresa?.nombre || "Empresa Aliada",
+    tituloVacante: c.vacante?.titulo || "Vacante",
+    ultimoMensaje: c.contenido
+}));
 
         res.json(resultado);
     } catch (error) {

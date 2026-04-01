@@ -182,31 +182,35 @@ router.put('/status-chat', async (req, res) => {
  * 5. MIS CHATS (Para la lista de la izquierda de la empresa)
  */
 /**
- * 5. MIS CHATS (Vista Empresa) - CORREGIDO (Sin duplicados)
+ * 5. MIS CHATS (Vista Empresa) - CORREGIDO Y BLINDADO
+ * Filtra para que una empresa solo vea candidatos con los que ELLA ha hablado.
  */
 router.get('/mis-chats/empresa/:empresaId', async (req, res) => {
     const empresaId = parseInt(req.params.empresaId);
+    
     try {
-        // En lugar de buscar mensajes, buscamos postulaciones de la empresa
-        // que tengan al menos un mensaje (así sabemos que hay chat)
         const postulaciones = await prisma.postulacion.findMany({
             where: {
+                // 1. La vacante debe ser de esta empresa
                 vacante: { empresaId: empresaId },
+                // 2. Filtro de seguridad: Solo si hay mensajes asociados a esta empresa
                 vacante: {
-                    mensajes: { some: {} } // Solo postulaciones con chat
+                    mensajes: {
+                        some: {
+                            OR: [
+                                { senderEmpresaId: empresaId },
+                                { receiverId: empresaId }
+                            ]
+                        }
+                    }
                 }
             },
             include: {
-                egresado: { select: { id: true, nombres: true, apellidos: true } },
-                vacante: { select: { id: true, titulo: true } },
-                // Traemos el último mensaje para mostrarlo y ordenar
-                vacante: {
-                    include: {
-                        mensajes: {
-                            orderBy: { fechaEnvio: 'desc' },
-                            take: 1
-                        }
-                    }
+                egresado: { 
+                    select: { id: true, nombres: true, apellidos: true } 
+                },
+                vacante: { 
+                    select: { id: true, titulo: true } 
                 }
             }
         });
@@ -214,17 +218,17 @@ router.get('/mis-chats/empresa/:empresaId', async (req, res) => {
         const resultado = await Promise.all(postulaciones.map(async (p) => {
             const egresadoId = p.egresadoId;
             
-            // CONTADOR DE PENDIENTES (Sigue igual, esto funciona bien)
+            // CONTADOR DE PENDIENTES: Específico de esta empresa y este egresado
             const pendientes = await prisma.mensaje.count({
-    where: {
-        vacanteId: p.vacanteId,
-        senderEgresadoId: egresadoId,
-        receiverId: empresaId, // <--- ESTO DEBE SER EL ID DE LA EMPRESA ACTUAL
-        read: false
-    }
-});
+                where: {
+                    vacanteId: p.vacanteId,
+                    senderEgresadoId: egresadoId,
+                    receiverId: empresaId,
+                    read: false
+                }
+            });
 
-            // Buscamos el último mensaje específico de este chat
+            // BUSCAMOS EL ÚLTIMO MENSAJE: Para la previsualización en la lista
             const ultimoMsg = await prisma.mensaje.findFirst({
                 where: {
                     vacanteId: p.vacanteId,
@@ -235,6 +239,10 @@ router.get('/mis-chats/empresa/:empresaId', async (req, res) => {
                 },
                 orderBy: { fechaEnvio: 'desc' }
             });
+
+            // Si por alguna razón extraña no hay mensajes específicos para esta empresa,
+            // no devolvemos este chat en el mapeo (filtro de seguridad final)
+            if (!ultimoMsg && pendientes === 0) return null;
 
             return {
                 usuarioId: egresadoId,
@@ -250,10 +258,12 @@ router.get('/mis-chats/empresa/:empresaId', async (req, res) => {
             };
         }));
 
-        // Ordenamos para que el chat con el mensaje más reciente salga arriba
-        resultado.sort((a, b) => new Date(b.fechaUltimo) - new Date(a.fechaUltimo));
+        // Limpiamos los nulos y ordenamos por fecha (más reciente arriba)
+        const resultadoFinal = resultado
+            .filter(chat => chat !== null)
+            .sort((a, b) => new Date(b.fechaUltimo) - new Date(a.fechaUltimo));
 
-        res.json(resultado);
+        res.json(resultadoFinal);
     } catch (error) {
         console.error("Error al obtener chats:", error);
         res.status(500).json({ error: "Error al obtener chats" });

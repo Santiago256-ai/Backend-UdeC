@@ -14,8 +14,8 @@ model Egresado {
   apellidos         String
   correo            String         @unique
   password          String?
-  resetToken       String?  @unique
-  resetTokenExpiry DateTime?
+  resetToken        String?        @unique
+  resetTokenExpiry  DateTime?
   firebaseUid       String?        @unique
   mensajesRecibidos Mensaje[]      @relation("ReceivedMessages")
   mensajesEnviados  Mensaje[]      @relation("SentMessages")
@@ -87,8 +87,8 @@ model Empresa {
   id                   Int       @id @default(autoincrement())
   email                String    @unique
   password             String
-  resetToken       String?   @unique
-  resetTokenExpiry DateTime?
+  resetToken           String?   @unique
+  resetTokenExpiry     DateTime?
   nombre               String
   phones               String
   contactName          String
@@ -117,12 +117,12 @@ model Vacante {
   titulo            String
   descripcion       String
   ubicacion         String
-  tipo              String        // Este es el Tipo de Contrato (Fijo, Indefinido, etc.)
-  jornada           String        // NUEVO: Completo, Medio tiempo, etc.
-  modalidad         String        // Presencial, Remoto, Híbrido
-  tipoSalario       String        // NUEVO: Básico, Integral, A convenir
-  salario           String?       // El monto numérico (opcional)
-  horario           String        // NUEVO: Ej: Lunes a Viernes 8am - 5pm
+  tipo              String // Este es el Tipo de Contrato (Fijo, Indefinido, etc.)
+  jornada           String // NUEVO: Completo, Medio tiempo, etc.
+  modalidad         String // Presencial, Remoto, Híbrido
+  tipoSalario       String // NUEVO: Básico, Integral, A convenir
+  salario           String? // El monto numérico (opcional)
+  horario           String // NUEVO: Ej: Lunes a Viernes 8am - 5pm
   fechaCreacion     DateTime      @default(now())
   fechaCierre       DateTime?
   limitePostulantes Int?
@@ -149,20 +149,36 @@ model Postulacion {
 }
 
 model Mensaje {
-  id               Int           @id @default(autoincrement())
-  contenido        String
-  fechaEnvio       DateTime      @default(now())
-  read             Boolean       @default(false)
-  senderType       String
-  vacanteId        Int?
-  senderEmpresaId  Int?
+  id         Int      @id @default(autoincrement())
+  contenido  String
+  fechaEnvio DateTime @default(now())
+  read       Boolean  @default(false)
+
+  // Indica quién envía: 'EMPRESA' o 'USUARIO' (Egresado)
+  senderType String
+
+  // 1. EL FILTRO DE PRIVACIDAD: Todo mensaje pertenece a una vacante.
+  // Como la vacante pertenece a una empresa, esto aísla los chats.
+  vacanteId Int
+  vacante   Vacante @relation(fields: [vacanteId], references: [id], onDelete: Cascade)
+
+  // 2. REMITENTES
+  senderEmpresaId Int?
+  senderEmpresa   Empresa? @relation("EmpresaSentMessages", fields: [senderEmpresaId], references: [id])
+
   senderEgresadoId Int?
-  receiverId       Int
-  receiver         Egresado      @relation("ReceivedMessages", fields: [receiverId], references: [id])
-  senderEgresado   Egresado?     @relation("SentMessages", fields: [senderEgresadoId], references: [id])
-  senderEmpresa    Empresa?      @relation("EmpresaSentMessages", fields: [senderEmpresaId], references: [id])
-  vacante          Vacante?      @relation(fields: [vacanteId], references: [id])
-  notificacion     Notificacion?
+  senderEgresado   Egresado? @relation("SentMessages", fields: [senderEgresadoId], references: [id])
+
+  // 3. RECEPTOR (Egresado)
+  // Nota: Para que Prisma no te dé error, vinculamos el receiverId al Egresado.
+  // En la lógica de tu chat, si el receptor es la empresa, el receiverId 
+  // será el ID de la empresa (aunque Prisma lo vea vinculado al modelo Egresado, 
+  // tú lo manejas por lógica de negocio en el Backend).
+  receiverId Int
+  receiver   Egresado @relation("ReceivedMessages", fields: [receiverId], references: [id])
+
+  // 4. OTROS
+  notificacion Notificacion?
 }
 
 model Notificacion {

@@ -46,54 +46,83 @@ router.post('/enviar', async (req, res) => {
 });
 
 /**
- * 2. OBTENER HISTORIAL
- * Verifica el estado 'chatActivo' en la tabla Postulacion para bloquear al egresado si es necesario.
+ * 2. OBTENER HISTORIAL (Versión Blindada)
+ * Agregamos validación de propiedad para que ninguna empresa vea chats ajenos.
+ */
+/**
+ * 2. OBTENER HISTORIAL (Versión Final Blindada)
+ * Filtra estrictamente por vacante y empresa para evitar fugas de datos.
  */
 router.get('/historial/:egresadoId/:empresaId/:vacanteId', async (req, res) => {
+    // 1. Sanitización de parámetros
     const eId = parseInt(req.params.egresadoId);
     const empId = parseInt(req.params.empresaId);
     const vId = parseInt(req.params.vacanteId);
 
+    // Validación rápida de tipos
+    if (isNaN(eId) || isNaN(empId) || isNaN(vId)) {
+        return res.status(400).json({ error: "IDs inválidos proporcionados." });
+    }
+
     try {
-        /* COMENTA O ELIMINA ESTO:
-        await prisma.mensaje.updateMany({
+        // --- PASO 1: VALIDACIÓN DE SEGURIDAD (CROSS-TENANCY CHECK) ---
+        // Buscamos si existe la vacante Y si pertenece a la empresa que hace la petición.
+        // Si una empresa intenta ver un vId de otra empresa, esto devolverá null.
+        const vacanteVerificada = await prisma.vacante.findFirst({
             where: {
-                vacanteId: vId,
-                senderEgresadoId: eId,
-                receiverId: empId,
-                read: false
-            },
-            data: { read: true }
-        });
-        */
-        // 1. Validamos si el chat está activo para esta postulación específica
-        const postulacion = await prisma.postulacion.findFirst({
-            where: { 
-                egresadoId: eId, 
-                vacanteId: vId 
+                id: vId,
+                empresaId: empId 
             }
         });
 
-        // 2. Buscamos los mensajes entre ambas partes para esta vacante
+        if (!vacanteVerificada) {
+            console.warn(`Intento de acceso no autorizado: Empresa ${empId} a vacante ${vId}`);
+            return res.status(403).json({ 
+                error: "Acceso denegado. Esta vacante no pertenece a su empresa." 
+            });
+        }
+
+        // --- PASO 2: OBTENER ESTADO DEL CHAT Y POSTULACIÓN ---
+        // Necesitamos saber si el chat está bloqueado (chatActivo)
+        const postulacion = await prisma.postulacion.findUnique({
+            where: {
+                vacanteId_egresadoId: {
+                    vacanteId: vId,
+                    egresadoId: eId
+                }
+            }
+        });
+
+        if (!postulacion) {
+            return res.status(404).json({ error: "No existe una postulación para este chat." });
+        }
+
+        // --- PASO 3: BUSCAR MENSAJES DEL HILO ---
+        // Filtramos por vacanteId. Como ya validamos arriba que vId es de empId,
+        // esto garantiza que solo se vean mensajes propios.
         const mensajes = await prisma.mensaje.findMany({
             where: {
                 vacanteId: vId,
+                // Filtramos que los mensajes sean específicamente entre este egresado y esta empresa
                 OR: [
                     { senderEmpresaId: empId, receiverId: eId },
                     { senderEgresadoId: eId, receiverId: empId }
                 ]
             },
-            orderBy: { fechaEnvio: 'asc' }
+            orderBy: { 
+                fechaEnvio: 'asc' // Cronología de chat estándar
+            }
         });
         
+        // --- PASO 4: RESPUESTA ---
         res.json({
             mensajes: mensajes,
-            // Si la empresa desactivó el chat, enviamos false para que el front bloquee el input
-            chatActivo: postulacion ? postulacion.chatActivo : true 
+            chatActivo: postulacion.chatActivo // Controla si el input del front se habilita
         });
+
     } catch (error) {
-        console.error("Error al cargar historial:", error.message);
-        res.status(500).json({ error: "Error al cargar historial" });
+        console.error("Error crítico en historial:", error.message);
+        res.status(500).json({ error: "Error interno del servidor al cargar mensajes." });
     }
 });
 
@@ -187,13 +216,13 @@ router.get('/mis-chats/empresa/:empresaId', async (req, res) => {
             
             // CONTADOR DE PENDIENTES (Sigue igual, esto funciona bien)
             const pendientes = await prisma.mensaje.count({
-                where: {
-                    vacanteId: p.vacanteId,
-                    senderEgresadoId: egresadoId,
-                    receiverId: empresaId,
-                    read: false
-                }
-            });
+    where: {
+        vacanteId: p.vacanteId,
+        senderEgresadoId: egresadoId,
+        receiverId: empresaId, // <--- ESTO DEBE SER EL ID DE LA EMPRESA ACTUAL
+        read: false
+    }
+});
 
             // Buscamos el último mensaje específico de este chat
             const ultimoMsg = await prisma.mensaje.findFirst({

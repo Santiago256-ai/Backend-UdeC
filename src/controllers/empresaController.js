@@ -213,3 +213,50 @@ export const eliminarEmpresaAdmin = async (req, res) => {
         res.status(500).json({ error: "Error al eliminar. Verifique si la empresa tiene vacantes activas." });
     }
 };
+
+// Actualizar datos de la empresa
+export const actualizarEmpresa = async (req, res) => {
+    try {
+        const { id } = req.params; // Obtenemos el ID de la URL
+        const data = req.body;     // Obtenemos los campos enviados desde el frontend
+
+        // 1. Verificar que la empresa exista
+        const empresaExistente = await prisma.empresa.findUnique({
+            where: { id: parseInt(id) }
+        });
+
+        if (!empresaExistente) {
+            return res.status(404).json({ error: "Empresa no encontrada" });
+        }
+
+        // 2. Limpiar y transformar datos sensibles o tipos de datos
+        // Si viene foundationYear, asegurar que sea un entero
+        if (data.foundationYear) {
+            data.foundationYear = parseInt(data.foundationYear);
+        }
+
+        // Evitar que el email se cambie si ya existe en otra empresa (opcional)
+        // O simplemente quitar el email del objeto data para que no sea editable
+        delete data.email; 
+        delete data.password; // La contraseña se debería manejar en otra función por seguridad
+
+        // 3. Actualizar en la base de datos
+        const empresaActualizada = await prisma.empresa.update({
+            where: { id: parseInt(id) },
+            data: data
+        });
+
+        // 4. Quitar la contraseña de la respuesta
+        const { password: _, ...empresaData } = empresaActualizada;
+
+        console.log(`✅ Empresa ID ${id} actualizada con éxito`);
+        res.json(empresaData);
+
+    } catch (error) {
+        console.error("❌ Error al actualizar empresa:", error);
+        if (error.code === 'P2002') {
+            return res.status(409).json({ error: "El NIT ya está registrado por otra empresa." });
+        }
+        res.status(500).json({ error: "Error interno al actualizar los datos corporativos." });
+    }
+};

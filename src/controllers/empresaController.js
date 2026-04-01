@@ -107,54 +107,38 @@ if (!companyName || !email || !phones || !contactName || !address || !city || !d
 // 🔐 NUEVA FUNCIÓN: Iniciar sesión de la empresa
 export const loginEmpresa = async (req, res) => {
     try {
-        // 1. Extraemos los datos del body
         const { identificador, contraseña: password } = req.body; 
-
-        // 2. Validamos que existan antes de transformar
-        if (!identificador || !password) {
-            return res.status(400).json({ error: "Faltan credenciales (email y password)." });
-        }
-
-        // 3. Ahora sí, normalizamos usando 'identificador'
         const correoABuscar = identificador.toLowerCase().trim();
 
-        // 1. Buscar la empresa por email
         const empresa = await prisma.empresa.findUnique({
             where: { email: correoABuscar },
+            // 💡 No necesitamos poner 'select' si queremos todos los campos, 
+            // Prisma por defecto trae todo el modelo Empresa.
         });
 
-        if (!empresa) {
+        if (!empresa || !(await bcrypt.compare(password, empresa.password))) {
             return res.status(401).json({ error: "Credenciales incorrectas." });
         }
 
-        // 2. Comparar la contraseña ingresada con el hash guardado
-        const passwordMatch = await bcrypt.compare(password, empresa.password);
-
-        if (!passwordMatch) {
-            return res.status(401).json({ error: "Credenciales incorrectas." });
-        }
-
-        // 3. Generar el Token Web JSON (JWT)
         const token = jwt.sign(
-            { id: empresa.id, email: empresa.email, rol: 'empresa' }, // Payload
+            { id: empresa.id, email: empresa.email, rol: 'empresa' },
             JWT_SECRET,
             { expiresIn: '1d' } 
         );
 
-        // 4. Devolver respuesta exitosa (sin el hash de la contraseña)
+        // 🔐 Quitamos la contraseña antes de enviar
         const { password: _, ...empresaData } = empresa;
 
         res.status(200).json({
             message: "Inicio de sesión exitoso",
             token,
             usuario: { 
-                ...empresaData,
-                rol: 'empresa' // ⬅️ CLAVE: Devuelve el rol para que el frontend pueda redireccionar
+                ...empresaData, // 👈 Esto ahora enviará NIT, address, phones, city, etc.
+                rol: 'empresa' 
             }
         });
 
     } catch (error) {
-        console.error("❌ Error al iniciar sesión de empresa:", error);
         res.status(500).json({ error: "Error interno del servidor." });
     }
 };

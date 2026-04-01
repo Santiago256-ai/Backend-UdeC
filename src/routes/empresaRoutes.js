@@ -1,27 +1,26 @@
 import { Router } from "express";
+import { authMiddleware } from "../middleware/authMiddleware.js"; // 👈 Nombre exacto
 import { 
     crearEmpresa, 
     listarEmpresas, 
     loginEmpresa,
     obtenerEmpresasParaAdmin,
-    eliminarEmpresaAdmin 
+    eliminarEmpresaAdmin,
+    obtenerPerfilEmpresa, // 👈 Agregar
+    actualizarEmpresa    // 👈 Agregar
 } from "../controllers/empresaController.js";
 
 const router = Router();
 
-// Crear empresa (POST /api/empresas)
-// ✅ CORREGIDO: La ruta ahora es solo "/"
 router.post("/", crearEmpresa);
-
-// Listar empresas (GET /api/empresas)
-// ✅ CORREGIDO: La ruta ahora es solo "/"
 router.get("/", listarEmpresas);
-
-// 🔐 RUTA DE LOGIN (POST /api/empresas/login)
-// ✅ CORREGIDO: La ruta ahora es solo "/login"
 router.post("/login", loginEmpresa); 
 
-// 🚀 NUEVO: Flujo exclusivo para el Administrador
+// 🚀 NUEVAS RUTAS PARA EL PERFIL
+// GET /api/empresas/:id -> Para cargar el perfil
+router.get("/:id", authMiddleware, obtenerPerfilEmpresa); 
+router.put("/:id", authMiddleware, actualizarEmpresa);
+
 router.get("/admin/todas", obtenerEmpresasParaAdmin);
 router.delete("/admin/:id", eliminarEmpresaAdmin);
 

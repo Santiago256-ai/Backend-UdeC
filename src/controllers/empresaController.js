@@ -213,3 +213,79 @@ export const eliminarEmpresaAdmin = async (req, res) => {
         res.status(500).json({ error: "Error al eliminar. Verifique si la empresa tiene vacantes activas." });
     }
 };
+
+// 🟢 NUEVO: Obtener perfil de una sola empresa por ID
+export const obtenerPerfilEmpresa = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const empresa = await prisma.empresa.findUnique({
+            where: { id: parseInt(id) },
+        });
+
+        if (!empresa) {
+            return res.status(404).json({ error: "Empresa no encontrada" });
+        }
+
+        // Excluimos la contraseña por seguridad
+        const { password: _, ...datosEmpresa } = empresa;
+        res.json(datosEmpresa);
+    } catch (error) {
+        console.error("❌ Error al obtener perfil:", error);
+        res.status(500).json({ error: "Error al cargar el perfil" });
+    }
+};
+
+// 🟢 ACTUALIZADO: Actualizar información de la empresa (Con validación de identidad)
+export const actualizarEmpresa = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const idNumerico = parseInt(id);
+        const dataToUpdate = req.body;
+
+        // 🛡️ SEGURIDAD 1: Validar que el ID del token (req.user) coincida con el ID de la URL
+        // Tu middleware guarda los datos en req.user
+        if (req.user.id !== idNumerico) {
+            return res.status(403).json({ 
+                error: "No tienes permisos para modificar este perfil. Acción denegada." 
+            });
+        }
+
+        // 🛡️ SEGURIDAD 2: Protegemos campos sensibles que NO deben cambiarse por aquí
+        delete dataToUpdate.email;
+        delete dataToUpdate.password;
+        delete dataToUpdate.id;
+        delete dataToUpdate.createdAt; // Campo de sistema
+
+        // 🛠️ FORMATEO: Aseguramos que los tipos de datos coincidan con Prisma
+        if (dataToUpdate.foundationYear) {
+            dataToUpdate.foundationYear = parseInt(dataToUpdate.foundationYear);
+        }
+        
+        // Si manejas arrays (como sectores o canales), Prisma los actualiza directamente 
+        // si vienen como un arreglo en el JSON.
+
+        const empresaActualizada = await prisma.empresa.update({
+            where: { id: idNumerico },
+            data: dataToUpdate
+        });
+
+        // 🛡️ SEGURIDAD 3: Limpiar respuesta
+        const { password: _, ...empresaSinPass } = empresaActualizada;
+
+        console.log(`✅ Perfil de empresa ID ${id} actualizado.`);
+        res.json({ 
+            message: "Perfil actualizado con éxito", 
+            empresa: empresaSinPass 
+        });
+
+    } catch (error) {
+        console.error("❌ Error al actualizar empresa:", error);
+        
+        // Manejo específico si intentan poner un NIT que ya existe en otra empresa
+        if (error.code === 'P2002') {
+            return res.status(409).json({ error: "El NIT ingresado ya está registrado por otra empresa." });
+        }
+
+        res.status(500).json({ error: "No se pudo actualizar la información en el servidor." });
+    }
+};

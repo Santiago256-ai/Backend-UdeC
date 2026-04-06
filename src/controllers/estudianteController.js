@@ -182,11 +182,17 @@ export const obtenerMiCV = async (req, res) => {
 // En tu controlador de backend
 export const obtenerPerfilBase = async (req, res) => {
     try {
-        const id = req.user.id; // ID que viene del token
+        const id = req.user.id; 
         const egresado = await prisma.egresado.findUnique({
             where: { id: parseInt(id) }
         });
-        res.json(egresado);
+        
+        if (!egresado) return res.status(404).json({ error: "No encontrado" });
+
+        // LOG DE DEPURACIÓN: Mira tu terminal de VS Code al abrir el perfil
+        console.log("Datos encontrados en DB:", egresado);
+
+        res.json(egresado); 
     } catch (error) {
         res.status(500).json({ error: "Error al obtener perfil" });
     }

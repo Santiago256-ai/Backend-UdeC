@@ -5,64 +5,65 @@ import jwt from 'jsonwebtoken';
 const JWT_SECRET = process.env.JWT_SECRET || 'mi_clave_secreta_debes_cambiarla';
 
 // ==========================================
-// Registro de Estudiante
+// Registro de Egresado (CORREGIDO)
 // ==========================================
 export const crearEstudiante = async (req, res) => {
-    const { nombres, apellidos, correo, usuario, contraseña, password, rol } = req.body; 
-    const passwordFinal = contraseña || password;
+    // Recibimos los campos del formulario de registro
+    const { nombres, apellidos, correo, password, facultad, programa, celular } = req.body; 
 
-    if (!nombres || !apellidos || !correo || !usuario || !passwordFinal) {
+    if (!nombres || !apellidos || !correo || !password) {
         return res.status(400).json({ 
-            error: 'Faltan campos obligatorios: nombres, apellidos, correo, usuario y contraseña.' 
+            error: 'Faltan campos obligatorios: nombres, apellidos, correo y contraseña.' 
         });
     }
 
     try {
-        const hashedPassword = await bcrypt.hash(passwordFinal, 10); 
-        const nuevoEstudiante = await prisma.usuario.create({
+        const hashedPassword = await bcrypt.hash(password, 10); 
+        
+        // Cambiado a prisma.egresado para coincidir con tu Schema
+        const nuevoEstudiante = await prisma.egresado.create({
             data: { 
                 nombres, 
                 apellidos, 
-                usuario, 
                 correo, 
                 password: hashedPassword,
-                rol: rol || 'estudiante',
+                facultad,
+                programa,
+                celular
             },
         });
+
         const { password: _, ...estudianteSinPassword } = nuevoEstudiante;
         res.status(201).json(estudianteSinPassword); 
     } catch (error) {
         if (error.code === 'P2002') {
-            const campoDuplicado = error.meta?.target?.includes('correo') ? 'correo' : 'nombre de usuario';
-            return res.status(409).json({ error: `El ${campoDuplicado} ya está registrado.` });
+            return res.status(409).json({ error: `El correo ya está registrado.` });
         }
         res.status(500).json({ error: 'Error interno al crear estudiante.' });
     }
 };
 
 // ==========================================
-// Inicio de Sesión
+// Inicio de Sesión (CORREGIDO)
 // ==========================================
 export const loginEstudiante = async (req, res) => {
-    const { identificador, contraseña, password } = req.body; 
-    const passwordIngresado = contraseña || password;
+    const { identificador, password } = req.body; 
 
     try {
-        const usuarioEncontrado = await prisma.usuario.findFirst({
-            where: {
-                OR: [{ correo: identificador }, { usuario: identificador }],
-            },
+        // Buscamos en el modelo egresado
+        const usuarioEncontrado = await prisma.egresado.findUnique({
+            where: { correo: identificador }
         });
 
         if (!usuarioEncontrado || !usuarioEncontrado.password) {
             return res.status(401).json({ error: 'Credenciales inválidas.' });
         }
 
-        const isMatch = await bcrypt.compare(passwordIngresado, usuarioEncontrado.password);
+        const isMatch = await bcrypt.compare(password, usuarioEncontrado.password);
         if (!isMatch) return res.status(401).json({ error: 'Credenciales inválidas.' });
 
         const token = jwt.sign(
-            { id: usuarioEncontrado.id, correo: usuarioEncontrado.correo, rol: usuarioEncontrado.rol },
+            { id: usuarioEncontrado.id, correo: usuarioEncontrado.correo },
             JWT_SECRET,
             { expiresIn: '1d' }
         );
@@ -76,56 +77,41 @@ export const loginEstudiante = async (req, res) => {
 };
 
 // ==========================================
-// GUARDAR / ACTUALIZAR CV (Hoja de Vida Digital)
-// ==========================================
-// ==========================================
-// GUARDAR / ACTUALIZAR CV (Hoja de Vida Digital)
+// GUARDAR / ACTUALIZAR CV (Mantenida tu lógica)
 // ==========================================
 export const guardarCV = async (req, res) => {
   try {
-    // ✅ CORRECCIÓN CRÍTICA: Forzamos el ID a número entero
-    const usuarioId = parseInt(req.user.id);
+    const uId = parseInt(req.user.id);
 
-    // Validación de seguridad para el ID
-    if (isNaN(usuarioId)) {
-      return res.status(400).json({ error: "El ID de usuario no es válido o no se recibió correctamente." });
+    if (isNaN(uId)) {
+      return res.status(400).json({ error: "El ID de usuario no es válido." });
     }
 
     const { personal, descripcion, habilidades, educacion, experiencia, idiomas, referencias } = req.body;
 
-    // Función para limpiar IDs temporales y filtrar nulos
     const prepararParaPrisma = (lista) => {
       if (!Array.isArray(lista)) return [];
-      
       return lista
-        .filter(item => 
-          item && 
-          typeof item === 'object' && 
-          Object.keys(item).length > 0 && 
-          (item.institucion || item.empresa || item.idioma || item.nombre) 
-        )
+        .filter(item => item && typeof item === 'object' && Object.keys(item).length > 0 && 
+          (item.institucion || item.empresa || item.idioma || item.nombre))
         .map(({ id, perfilId, ...resto }) => resto);
     };
 
-    // Ejecución del upsert con el ID corregido
     const perfil = await prisma.perfilCV.upsert({
-      where: { usuarioId: usuarioId },
+      where: { egresadoId: uId }, // Cambiado a egresadoId por tu Schema
       update: {
-        telefono: personal?.telefono,
-        email: personal?.email,
+        celular: personal?.telefono,
         direccion: personal?.direccion,
         descripcion,
         habilidades,
-        // Limpiamos y recreamos las relaciones para evitar duplicados o IDs huérfanos
         educacion: { deleteMany: {}, create: prepararParaPrisma(educacion) },
         experiencia: { deleteMany: {}, create: prepararParaPrisma(experiencia) },
         idiomas: { deleteMany: {}, create: prepararParaPrisma(idiomas) },
         referencias: { deleteMany: {}, create: prepararParaPrisma(referencias) },
       },
       create: {
-        usuarioId: usuarioId, // ✅ ID como número
-        telefono: personal?.telefono,
-        email: personal?.email,
+        egresadoId: uId, // Cambiado a egresadoId
+        celular: personal?.telefono,
         direccion: personal?.direccion,
         descripcion,
         habilidades,
@@ -140,35 +126,24 @@ export const guardarCV = async (req, res) => {
     
   } catch (error) {
     console.error("Error detallado en guardarCV:", error);
-
-    // Manejo específico del error de Llave Foránea de Prisma
-    if (error.code === 'P2003') {
-      return res.status(404).json({ 
-        error: "No se pudo guardar", 
-        detalle: "El usuario no existe en la base de datos. Por favor, vuelve a iniciar sesión." 
-      });
-    }
-
-    res.status(500).json({ 
-      error: "No se pudo guardar la información", 
-      detalle: error.message 
-    });
+    res.status(500).json({ error: "No se pudo guardar la información", detalle: error.message });
   }
 };
 
 // ==========================================
-// OBTENER CV (Para cargar el formulario)
+// OBTENER CV (Mantenida tu lógica)
 // ==========================================
 export const obtenerMiCV = async (req, res) => {
   try {
-    const usuarioId = req.user.id;
+    const uId = req.user.id;
     const cv = await prisma.perfilCV.findUnique({
-      where: { usuarioId: usuarioId },
+      where: { egresadoId: parseInt(uId) }, // Cambiado a egresadoId
       include: {
         educacion: true,
         experiencia: true,
         idiomas: true,
         referencias: true,
+        aptitudes: true,
       },
     });
 
@@ -179,7 +154,9 @@ export const obtenerMiCV = async (req, res) => {
   }
 };
 
-// En tu controlador de backend
+// ==========================================
+// OBTENER PERFIL BASE (DATOS DE REGISTRO)
+// ==========================================
 export const obtenerPerfilBase = async (req, res) => {
     try {
         const id = req.user.id; 
@@ -189,52 +166,44 @@ export const obtenerPerfilBase = async (req, res) => {
         
         if (!egresado) return res.status(404).json({ error: "No encontrado" });
 
-        // LOG DE DEPURACIÓN: Mira tu terminal de VS Code al abrir el perfil
-        console.log("Datos encontrados en DB:", egresado);
-
-        res.json(egresado); 
+        const { password, ...datosPublicos } = egresado;
+        res.json(datosPublicos); 
     } catch (error) {
         res.status(500).json({ error: "Error al obtener perfil" });
     }
 };
+
 // ==========================================
-// ACTUALIZAR DATOS DE REGISTRO DEL EGRESADO
+// ACTUALIZAR DATOS DE REGISTRO
 // ==========================================
 export const actualizarEgresado = async (req, res) => {
     try {
-        // 1. Validar que el ID venga del token y sea numérico
         const egresadoId = parseInt(req.user.id);
 
         if (isNaN(egresadoId)) {
-            return res.status(400).json({ error: "Sesión no válida o ID de egresado corrupto." });
+            return res.status(400).json({ error: "ID de egresado corrupto." });
         }
 
-        // 2. Extraemos los campos que el usuario registró inicialmente
-        // NOTA: No incluimos correo ni password por seguridad.
         const { nombres, apellidos, celular } = req.body;
 
-        // 3. Verificamos que el egresado exista en la tabla EGRESADO
         const egresadoExistente = await prisma.egresado.findUnique({
             where: { id: egresadoId }
         });
 
         if (!egresadoExistente) {
-            return res.status(404).json({ error: "El egresado no existe en el sistema." });
+            return res.status(404).json({ error: "El egresado no existe." });
         }
 
-        // 4. Ejecutamos la actualización
         const egresadoActualizado = await prisma.egresado.update({
             where: { id: egresadoId },
             data: {
                 nombres: nombres || egresadoExistente.nombres,
                 apellidos: apellidos || egresadoExistente.apellidos,
-                // Si en tu modelo de Prisma el campo se llama 'celular', lo actualizamos:
                 celular: celular || egresadoExistente.celular, 
             },
         });
 
-        // 5. Limpieza de datos antes de enviar la respuesta
-        const { password, resetToken, resetTokenExpiry, ...datosSeguros } = egresadoActualizado;
+        const { password, ...datosSeguros } = egresadoActualizado;
         
         res.status(200).json({
             message: "Datos de registro actualizados correctamente",
@@ -243,6 +212,6 @@ export const actualizarEgresado = async (req, res) => {
 
     } catch (error) {
         console.error("Error al actualizar egresado:", error);
-        res.status(500).json({ error: "Error interno del servidor al intentar actualizar." });
+        res.status(500).json({ error: "Error interno al intentar actualizar." });
     }
 };

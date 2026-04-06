@@ -179,50 +179,64 @@ export const obtenerMiCV = async (req, res) => {
   }
 };
 
+// En tu controlador de backend
+export const obtenerPerfilBase = async (req, res) => {
+    try {
+        const id = req.user.id; // ID que viene del token
+        const egresado = await prisma.egresado.findUnique({
+            where: { id: parseInt(id) }
+        });
+        res.json(egresado);
+    } catch (error) {
+        res.status(500).json({ error: "Error al obtener perfil" });
+    }
+};
 // ==========================================
-// ACTUALIZAR DATOS BÁSICOS DEL EGRESADO
+// ACTUALIZAR DATOS DE REGISTRO DEL EGRESADO
 // ==========================================
 export const actualizarEgresado = async (req, res) => {
     try {
-        // 1. Validar que el ID sea numérico
+        // 1. Validar que el ID venga del token y sea numérico
         const egresadoId = parseInt(req.user.id);
 
         if (isNaN(egresadoId)) {
-            return res.status(400).json({ error: "ID de egresado no válido" });
+            return res.status(400).json({ error: "Sesión no válida o ID de egresado corrupto." });
         }
 
-        const { nombres, apellidos } = req.body;
+        // 2. Extraemos los campos que el usuario registró inicialmente
+        // NOTA: No incluimos correo ni password por seguridad.
+        const { nombres, apellidos, celular } = req.body;
 
-        // 2. Validar que el egresado exista usando el modelo correcto: EGRESADO
+        // 3. Verificamos que el egresado exista en la tabla EGRESADO
         const egresadoExistente = await prisma.egresado.findUnique({
             where: { id: egresadoId }
         });
 
         if (!egresadoExistente) {
-            return res.status(404).json({ error: "Egresado no encontrado" });
+            return res.status(404).json({ error: "El egresado no existe en el sistema." });
         }
 
-        // 3. Actualizar en la tabla correcta: EGRESADO
+        // 4. Ejecutamos la actualización
         const egresadoActualizado = await prisma.egresado.update({
             where: { id: egresadoId },
             data: {
                 nombres: nombres || egresadoExistente.nombres,
                 apellidos: apellidos || egresadoExistente.apellidos,
-                // Si agregas el campo 'usuario' a tu modelo Egresado en Prisma, 
-                // podrías activarlo aquí. Por ahora, tu modelo no lo tiene.
+                // Si en tu modelo de Prisma el campo se llama 'celular', lo actualizamos:
+                celular: celular || egresadoExistente.celular, 
             },
         });
 
-        // 4. Limpieza de datos sensibles (password)
+        // 5. Limpieza de datos antes de enviar la respuesta
         const { password, resetToken, resetTokenExpiry, ...datosSeguros } = egresadoActualizado;
         
         res.status(200).json({
-            message: "Perfil actualizado correctamente",
+            message: "Datos de registro actualizados correctamente",
             egresado: datosSeguros
         });
 
     } catch (error) {
         console.error("Error al actualizar egresado:", error);
-        res.status(500).json({ error: "Error interno al actualizar el perfil" });
+        res.status(500).json({ error: "Error interno del servidor al intentar actualizar." });
     }
 };

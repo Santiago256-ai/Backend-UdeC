@@ -4,7 +4,9 @@ import {
     crearEstudiante, 
     loginEstudiante, 
     guardarCV, 
-    obtenerMiCV 
+    obtenerMiCV,
+    obtenerPerfilBase,    // 👈 Nueva importación: Lee datos de registro
+    actualizarEgresado    // 👈 Nueva importación: Actualiza datos de registro
 } from "../controllers/estudianteController.js"; 
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
@@ -14,12 +16,21 @@ const router = Router();
 router.post("/registro", crearEstudiante);
 router.post("/login", loginEstudiante); 
 
-// --- RUTAS DE LA HOJA DE VIDA DIGITAL ---
-// Obtener los datos para cargar el formulario (useEffect)
-router.get("/mi-cv", authMiddleware, obtenerMiCV);
+// --- RUTAS DE PERFIL BASE (DATOS DE REGISTRO) ---
+// Estas rutas sirven para el componente PerfilEgresado.jsx
 
-// Guardar los datos del formulario (botón GUARDAR)
+// 1. Obtener datos (Nombre, Apellidos, Facultad, Programa, Celular)
+router.get("/perfil", authMiddleware, obtenerPerfilBase);
+
+// 2. Actualizar esos mismos datos
+router.put("/actualizar", authMiddleware, actualizarEgresado);
+
+
+// --- RUTAS DE LA HOJA DE VIDA DIGITAL ---
+// Estas rutas son exclusivamente para la Hoja de Vida (CV)
+router.get("/mi-cv", authMiddleware, obtenerMiCV);
 router.post("/guardar-cv", authMiddleware, guardarCV);
+
 
 // --- RUTAS DE POSTULACIÓN ---
 
@@ -28,7 +39,7 @@ router.get("/usuario/:usuarioId", authMiddleware, async (req, res) => {
     try {
         const uId = parseInt(req.params.usuarioId);
         const postulaciones = await prisma.postulacion.findMany({
-            where: { egresadoId: uId }, // ✅ CAMBIAR 'usuarioId' por 'egresadoId'
+            where: { egresadoId: uId },
             include: { vacante: true },
         });
         res.json(postulaciones);
@@ -38,31 +49,24 @@ router.get("/usuario/:usuarioId", authMiddleware, async (req, res) => {
 });
 
 // 2. Postularse a una vacante
-// 2. Postularse a una vacante
 router.post("/:vacanteId/postular", authMiddleware, async (req, res) => {
     try {
         const { telefono } = req.body;
         const vId = parseInt(req.params.vacanteId);
-        
-        // Usamos uId para no confundirnos, viene del token (authMiddleware)
         const uId = parseInt(req.user.id); 
 
         if (isNaN(vId) || isNaN(uId)) {
             return res.status(400).json({ error: "ID de vacante o usuario inválido" });
         }
 
-        // 1. Buscamos el perfil usando el nombre correcto: egresadoId
-        // Cambiamos 'id' por 'uId' que es la variable definida arriba
         const perfil = await prisma.perfilCV.findUnique({
             where: { egresadoId: uId } 
         });
 
-        // 2. Creamos la postulación con los nombres exactos de tu MODELO
         const postulacion = await prisma.postulacion.create({
             data: {
                 vacanteId: vId,
-                egresadoId: uId, // ✅ Coincide con tu Schema
-                // En PerfilCV el campo es 'celular', no 'telefono'
+                egresadoId: uId,
                 telefono: telefono || perfil?.celular || "Sin teléfono", 
                 estado: "PENDIENTE"
             },

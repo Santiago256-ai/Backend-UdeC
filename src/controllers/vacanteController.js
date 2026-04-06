@@ -95,30 +95,28 @@ export const listarVacantesPorEmpresa = async (req, res) => {
 };
 
 // 🟡 3. Listar todas las vacantes (Para el feed de estudiantes)
+// 🟡 3. Listar todas las vacantes (Busca esta sección en vacanteController.js)
 export const listarVacantes = async (req, res) => {
     try {
         const vacantes = await prisma.vacante.findMany({
-            where: {
-                estado: "ABIERTA"
-            },
+            where: { estado: "ABIERTA" },
             include: {
-                empresa: true, // Esto trae todos los datos de la empresa (nombre, logo, etc.)
+                empresa: true,
                 postulaciones: {
                     select: {
-                        egresadoId: true // Solo el ID para comparar en el front
+                        egresadoId: true,
+                        estado: true, // <--- ¡AQUÍ ESTÁ EL TRUCO! Agrega esta línea
+                        fecha: true   // Aprovechemos para traer la fecha real también
                     }
                 },
                 _count: {
-                    select: {
-                        postulaciones: true // Para el contador de cupos
-                    }
+                    select: { postulaciones: true }
                 }
             },
             orderBy: { id: "desc" },
         });
         res.json(vacantes);
     } catch (error) {
-        // Esto te dirá en la consola de Vercel exactamente qué palabra está mal
         console.error("❌ Error detallado de Prisma:", error.message);
         res.status(500).json({ error: "Error interno al listar vacantes." });
     }

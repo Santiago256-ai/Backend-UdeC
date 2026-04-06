@@ -16,30 +16,40 @@ const prisma = new PrismaClient();
 // =========================================================
 // REGISTRO DE EGRESADOS
 // =========================================================
+// =========================================================
+// REGISTRO DE EGRESADOS (CORREGIDO)
+// =========================================================
 export const register = async (req, res) => {
   try {
-    const { nombres, apellidos, correo, password } = req.body; 
+    // 1. Extraemos TODOS los campos que envía el formulario
+    const { nombres, apellidos, correo, password, facultad, programa, celular } = req.body; 
 
     // ✅ NORMALIZAR A MINÚSCULAS
     const correoMinusculas = correo.toLowerCase();
 
-    // 1. Verificar usando la variable normalizada
+    // 2. Verificar si ya existe
     const existe = await prisma.egresado.findUnique({ where: { correo: correoMinusculas } });
     if (existe) return res.status(400).json({ message: "El correo ya está registrado" });
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // 3. PASAR LOS DATOS A PRISMA
     const nuevoEgresado = await prisma.egresado.create({
       data: { 
         nombres, 
         apellidos, 
-        correo: correoMinusculas, // ✅ Se guarda en minúsculas
-        password: hashedPassword 
+        correo: correoMinusculas,
+        password: hashedPassword,
+        // 🟢 ESTOS SON LOS QUE FALTABAN:
+        facultad,
+        programa,
+        celular 
       },
     });
 
     res.status(201).json(nuevoEgresado);
   } catch (error) {
+    console.error("Error en registro:", error);
     res.status(500).json({ error: error.message });
   }
 };

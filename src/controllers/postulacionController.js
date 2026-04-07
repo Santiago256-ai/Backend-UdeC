@@ -90,6 +90,7 @@ export const obtenerPostulacionesPorVacante = async (req, res) => {
 
 // 🟢 ACTUALIZAR ESTADO DE POSTULACIÓN
 // 🟢 ACTUALIZAR ESTADO DE POSTULACIÓN (Versión Pipeline Profesional)
+// 🟢 ACTUALIZAR ESTADO DE POSTULACIÓN
 export const actualizarEstadoPostulacion = async (req, res) => {
     try {
         const postulacionId = parseInt(req.params.id);
@@ -99,38 +100,43 @@ export const actualizarEstadoPostulacion = async (req, res) => {
             return res.status(400).json({ error: "Datos inválidos." });
         }
 
-        // 🆕 Lista expandida para coincidir con el Frontend
-        const estadosValidos = [
-            "PENDIENTE", 
-            "REVISION", 
-            "ENTREVISTA", 
-            "PRUEBA", 
-            "FINALISTA", 
-            "CONTRATADO", 
-            "RECHAZADO"
-        ];
+        const estadosValidos = ["PENDIENTE", "REVISION", "ENTREVISTA", "PRUEBA", "FINALISTA", "CONTRATADO", "RECHAZADO"];
 
         if (!estadosValidos.includes(estado.toUpperCase())) {
             return res.status(400).json({ 
-                error: `Estado '${estado}' no válido. Use uno de: ${estadosValidos.join(", ")}` 
+                error: `Estado '${estado}' no válido.` 
             });
         }
 
+        // 1. Actualizamos la postulación
         const postulacionActualizada = await prisma.postulacion.update({
             where: { id: postulacionId },
             data: { estado: estado.toUpperCase() },
             include: { 
                 egresado: true,
-                vacante: { select: { titulo: true } } // Opcional: para saber qué vacante es
+                vacante: { select: { titulo: true } } 
             } 
         });
 
-        console.log(`✅ Postulación ${postulacionId} movida a: ${estado.toUpperCase()}`);
+        // 2. 🔔 CREAR LA NOTIFICACIÓN PARA EL EGRESADO
+        // Usamos los datos que ya vienen en el 'include' de la actualización
+        await prisma.notificacion.create({
+            data: {
+                tipo: 'POSTULACION',
+                contenido: `Tu postulación a la vacante "${postulacionActualizada.vacante.titulo}" ha cambiado a: ${estado.toUpperCase()}`,
+                egresadoId: postulacionActualizada.egresadoId,
+                referenciaId: postulacionActualizada.vacanteId, // Para que el frontend sepa a qué vacante ir
+                vista: false,
+                fecha: new Date()
+            }
+        });
+
+        console.log(`✅ Notificación enviada a ${postulacionActualizada.egresado.correo}`);
         res.json(postulacionActualizada);
 
     } catch (error) {
-        console.error("❌ Error al actualizar estado:", error.message);
-        res.status(500).json({ error: "Error al actualizar la postulación en la base de datos." });
+        console.error("❌ Error al actualizar estado y notificar:", error.message);
+        res.status(500).json({ error: "Error al actualizar la postulación." });
     }
 };
 

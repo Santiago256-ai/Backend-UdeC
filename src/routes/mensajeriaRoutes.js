@@ -11,18 +11,23 @@ const prisma = new PrismaClient();
 router.post('/enviar', async (req, res) => {
     const { contenido, senderType, senderEmpresaId, senderEgresadoId, receiverId, vacanteId } = req.body;
 
-    // Validación de campos según el remitente
     if (!contenido || !vacanteId || !receiverId) {
         return res.status(400).json({ error: "Faltan campos obligatorios" });
     }
 
     try {
+        // Primero buscamos el nombre de la vacante para que la notificación sea clara
+        const vacanteInfo = await prisma.vacante.findUnique({
+            where: { id: parseInt(vacanteId) },
+            select: { titulo: true }
+        });
+
         const nuevoMensaje = await prisma.mensaje.create({
             data: {
                 contenido,
                 senderType,
                 vacanteId: parseInt(vacanteId),
-                receiverId: parseInt(receiverId), // En tu DB el receiver siempre es Egresado
+                receiverId: parseInt(receiverId),
                 senderEmpresaId: senderType === 'EMPRESA' ? parseInt(senderEmpresaId) : null,
                 senderEgresadoId: senderType === 'USUARIO' ? parseInt(senderEgresadoId) : null,
                 
@@ -30,14 +35,16 @@ router.post('/enviar', async (req, res) => {
                 ...(senderType === 'EMPRESA' && {
                     notificacion: {
                         create: {
-                            tipo: 'MENSAJE_NUEVO',
-                            contenido: `La empresa te ha enviado un mensaje`,
-                            egresadoId: parseInt(receiverId)
+                            tipo: 'MENSAJE', // Usamos 'MENSAJE' para que coincida con el Icono del Front
+                            contenido: `Nuevo mensaje sobre la vacante: ${vacanteInfo?.titulo || 'Oferta laboral'}`,
+                            egresadoId: parseInt(receiverId),
+                            referenciaId: parseInt(vacanteId) // Importante para que al dar clic lo lleve al chat correcto
                         }
                     }
                 })
             }
         });
+
         res.status(201).json(nuevoMensaje);
     } catch (error) {
         console.error("Error al enviar mensaje:", error.message);

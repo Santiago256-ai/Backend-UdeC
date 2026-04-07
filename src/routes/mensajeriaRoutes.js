@@ -294,19 +294,22 @@ router.get('/mis-chats/egresado/:egresadoId', async (req, res) => {
             distinct: ['vacanteId'],
             include: {
                 senderEmpresa: { select: { id: true, nombre: true } },
-                vacante: { select: { titulo: true } }
+                vacante: { select: { titulo: true, empresaId: true } }
             },
             orderBy: { fechaEnvio: 'desc' }
         });
 
         const resultado = conversaciones.map(c => ({
-    vacanteId: c.vacanteId,
-    // ¡ESTA LÍNEA ES LA MÁS IMPORTANTE!
-    empresaId: c.senderEmpresaId || c.vacante?.empresaId, 
-    nombreEmpresa: c.senderEmpresa?.nombre || "Empresa Aliada",
-    tituloVacante: c.vacante?.titulo || "Vacante",
-    ultimoMensaje: c.contenido
-}));
+            vacanteId: c.vacanteId,
+            empresaId: c.senderEmpresaId || c.vacante?.empresaId, 
+            nombreEmpresa: c.senderEmpresa?.nombre || "Empresa Aliada",
+            tituloVacante: c.vacante?.titulo || "Vacante",
+            ultimoMensaje: c.contenido,
+            // --- NUEVOS CAMPOS PARA LA LÓGICA DE "OSCURITO" ---
+            ultimoMsgSenderType: c.senderType, // 'EMPRESA' o 'USUARIO'
+            leido: c.read, // true o false
+            fechaUltimo: c.fechaEnvio
+        }));
 
         res.json(resultado);
     } catch (error) {

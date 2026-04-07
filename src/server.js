@@ -20,6 +20,7 @@ import estudianteRoutes from "./routes/estudianteRoutes.js";
 import mensajeriaRoutes from "./routes/mensajeriaRoutes.js"; 
 import cvsRoutes from "./routes/cvsRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
+import notificacionRoutes from './routes/notificacionRoutes.js';
 
 const app = express();
 
@@ -91,6 +92,7 @@ app.use("/api/estudiantes", estudianteRoutes);
 app.use("/api/mensajeria", mensajeriaRoutes); 
 app.use("/api/cvs", cvsRoutes);
 app.use("/api/usuarios", userRoutes);
+app.use('/api/notificaciones', notificacionRoutes);
 
 // ----------------- INICIALIZACIÓN -----------------
 const PORT = process.env.PORT || 8080;

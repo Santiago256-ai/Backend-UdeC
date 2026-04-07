@@ -30,3 +30,21 @@ export const marcarNotificacionLeida = async (req, res) => {
         res.status(500).json({ error: "No se pudo marcar como leída" });
     }
 };
+
+// Borrar una notificación específica por ID
+export const eliminarNotificacion = async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        await prisma.notificacion.delete({
+            where: {
+                id: parseInt(id)
+            }
+        });
+        
+        res.json({ message: "Notificación eliminada correctamente" });
+    } catch (error) {
+        console.error("❌ Error al eliminar notificación:", error.message);
+        res.status(500).json({ error: "No se pudo eliminar la notificación." });
+    }
+};

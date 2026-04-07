@@ -281,6 +281,9 @@ router.get('/mis-chats/empresa/:empresaId', async (req, res) => {
  * 6. MIS CHATS (Vista Egresado/Estudiante)
  * Muestra las empresas con las que el estudiante tiene chats.
  */
+/**
+ * 6. MIS CHATS (Vista Egresado/Estudiante)
+ */
 router.get('/mis-chats/egresado/:egresadoId', async (req, res) => {
     const eId = parseInt(req.params.egresadoId);
     try {
@@ -294,7 +297,14 @@ router.get('/mis-chats/egresado/:egresadoId', async (req, res) => {
             distinct: ['vacanteId'],
             include: {
                 senderEmpresa: { select: { id: true, nombre: true } },
-                vacante: { select: { titulo: true, empresaId: true } }
+                vacante: { 
+                    select: { 
+                        titulo: true, 
+                        empresaId: true,
+                        // ESTO ES LO QUE FALTABA:
+                        empresa: { select: { nombre: true } } 
+                    } 
+                }
             },
             orderBy: { fechaEnvio: 'desc' }
         });
@@ -302,12 +312,12 @@ router.get('/mis-chats/egresado/:egresadoId', async (req, res) => {
         const resultado = conversaciones.map(c => ({
             vacanteId: c.vacanteId,
             empresaId: c.senderEmpresaId || c.vacante?.empresaId, 
-            nombreEmpresa: c.senderEmpresa?.nombre || "Empresa Aliada",
+            // Ahora c.vacante.empresa.nombre SÍ existirá
+            nombreEmpresa: c.vacante?.empresa?.nombre || c.senderEmpresa?.nombre || "Empresa Aliada",
             tituloVacante: c.vacante?.titulo || "Vacante",
             ultimoMensaje: c.contenido,
-            // --- NUEVOS CAMPOS PARA LA LÓGICA DE "OSCURITO" ---
-            ultimoMsgSenderType: c.senderType, // 'EMPRESA' o 'USUARIO'
-            leido: c.read, // true o false
+            ultimoMsgSenderType: c.senderType,
+            leido: c.read,
             fechaUltimo: c.fechaEnvio
         }));
 
@@ -315,6 +325,28 @@ router.get('/mis-chats/egresado/:egresadoId', async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Error al obtener chats del egresado" });
+    }
+});
+
+/**
+ * 7. MARCAR COMO LEÍDO (Versión Egresado)
+ */
+router.put('/leer-mensajes-egresado', async (req, res) => {
+    const { egresadoId, empresaId, vacanteId } = req.body;
+    try {
+        await prisma.mensaje.updateMany({
+            where: {
+                vacanteId: parseInt(vacanteId),
+                senderEmpresaId: parseInt(empresaId), // Mensajes que vienen de la empresa
+                receiverId: parseInt(egresadoId),    // Recibidos por el estudiante
+                read: false
+            },
+            data: { read: true }
+        });
+        res.json({ success: true });
+    } catch (error) {
+        console.error("Error al marcar lectura egresado:", error);
+        res.status(500).json({ error: "No se pudo actualizar el estado de lectura" });
     }
 });
 

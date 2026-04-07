@@ -145,6 +145,7 @@ model Postulacion {
   fecha      DateTime @default(now())
   vacanteId  Int
   egresadoId Int
+  notificaciones Notificacion[]
   egresado   Egresado @relation(fields: [egresadoId], references: [id])
   vacante    Vacante  @relation(fields: [vacanteId], references: [id])
 
@@ -185,14 +186,21 @@ model Mensaje {
 }
 
 model Notificacion {
-  id           Int      @id @default(autoincrement())
+  id           Int          @id @default(autoincrement())
   tipo         String
   contenido    String
-  fecha        DateTime @default(now())
-  vista        Boolean  @default(false)
+  fecha        DateTime     @default(now())
+  vista        Boolean      @default(false)
   referenciaId Int?
-  mensajeId    Int?     @unique
+  
+  mensajeId    Int?         @unique
+  mensaje      Mensaje?     @relation(fields: [mensajeId], references: [id])
+  
+  // --- AGREGA ESTO ---
+  postulacionId Int?        
+  postulacion   Postulacion? @relation(fields: [postulacionId], references: [id])
+  // -------------------
+
   egresadoId   Int
-  egresado     Egresado @relation(fields: [egresadoId], references: [id])
-  mensaje      Mensaje? @relation(fields: [mensajeId], references: [id])
+  egresado     Egresado     @relation(fields: [egresadoId], references: [id])
 }

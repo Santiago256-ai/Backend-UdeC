@@ -21,7 +21,7 @@ export const crearPostulacion = async (req, res) => {
       return res.status(400).json({ error: "ID de egresado o vacante no válido." });
     }
 
-    // Verificar si la vacante existe y está abierta
+    // 1. Verificar si la vacante existe y está abierta
     const vacante = await prisma.vacante.findUnique({
         where: { id: vId }
     });
@@ -29,7 +29,22 @@ export const crearPostulacion = async (req, res) => {
     if (!vacante) return res.status(404).json({ error: "La vacante no existe." });
     if (vacante.estado === "CERRADA") return res.status(400).json({ error: "Vacante cerrada." });
 
-    // Guardar en Neon (Sin subir nada a Supabase)
+    // --- AQUÍ VA EL PUNTO 2: OPTIMIZACIÓN (EVITAR DUPLICADOS) ---
+    const yaPostulado = await prisma.postulacion.findUnique({
+        where: {
+            vacanteId_egresadoId: {
+                vacanteId: vId,
+                egresadoId: uId
+            }
+        }
+    });
+
+    if (yaPostulado) {
+        return res.status(400).json({ error: "Ya te has postulado a esta vacante anteriormente." });
+    }
+    // -----------------------------------------------------------
+
+    // 3. Guardar en Neon (Si pasó las validaciones anteriores)
     const postulacion = await prisma.postulacion.create({
       data: {
         telefono: String(telefono),
@@ -37,7 +52,6 @@ export const crearPostulacion = async (req, res) => {
         egresadoId: uId,
         estado: "PENDIENTE", 
         anclado: false,
-        // Ya no enviamos cv_url porque el Admin verá el PerfilCV vinculado al egresadoId
       },
       include: { egresado: true }
     });
@@ -125,7 +139,8 @@ export const actualizarEstadoPostulacion = async (req, res) => {
                 tipo: 'POSTULACION',
                 contenido: `Tu postulación a la vacante "${postulacionActualizada.vacante.titulo}" ha cambiado a: ${estado.toUpperCase()}`,
                 egresadoId: postulacionActualizada.egresadoId,
-                referenciaId: postulacionActualizada.vacanteId, // Para que el frontend sepa a qué vacante ir
+                referenciaId: postulacionActualizada.vacanteId, 
+                postulacionId: postulacionId,
                 vista: false,
                 fecha: new Date()
             }

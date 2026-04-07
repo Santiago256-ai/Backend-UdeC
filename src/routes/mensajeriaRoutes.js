@@ -16,12 +16,13 @@ router.post('/enviar', async (req, res) => {
     }
 
     try {
-        // Primero buscamos el nombre de la vacante para que la notificación sea clara
+        // 1. Buscamos el nombre de la vacante
         const vacanteInfo = await prisma.vacante.findUnique({
             where: { id: parseInt(vacanteId) },
             select: { titulo: true }
         });
 
+        // 2. CREAMOS EL MENSAJE PRIMERO
         const nuevoMensaje = await prisma.mensaje.create({
             data: {
                 contenido,
@@ -30,20 +31,21 @@ router.post('/enviar', async (req, res) => {
                 receiverId: parseInt(receiverId),
                 senderEmpresaId: senderType === 'EMPRESA' ? parseInt(senderEmpresaId) : null,
                 senderEgresadoId: senderType === 'USUARIO' ? parseInt(senderEgresadoId) : null,
-                
-                // Si envía la empresa, creamos notificación para el egresado
-                ...(senderType === 'EMPRESA' && {
-                    notificacion: {
-                        create: {
-                            tipo: 'MENSAJE', // Usamos 'MENSAJE' para que coincida con el Icono del Front
-                            contenido: `Nuevo mensaje sobre la vacante: ${vacanteInfo?.titulo || 'Oferta laboral'}`,
-                            egresadoId: parseInt(receiverId),
-                            referenciaId: parseInt(vacanteId) // Importante para que al dar clic lo lleve al chat correcto
-                        }
-                    }
-                })
             }
         });
+
+        // 3. SI ENVÍA LA EMPRESA, CREAMOS LA NOTIFICACIÓN VINCULADA
+        if (senderType === 'EMPRESA') {
+            await prisma.notificacion.create({
+                data: {
+                    tipo: 'MENSAJE',
+                    contenido: `Nuevo mensaje sobre la vacante: ${vacanteInfo?.titulo || 'Oferta laboral'}`,
+                    egresadoId: parseInt(receiverId),
+                    referenciaId: parseInt(vacanteId), // ID de la vacante para abrir el chat
+                    mensajeId: nuevoMensaje.id      // <--- CLAVE: El ID exacto para el sombreado
+                }
+            });
+        }
 
         res.status(201).json(nuevoMensaje);
     } catch (error) {
@@ -52,10 +54,6 @@ router.post('/enviar', async (req, res) => {
     }
 });
 
-/**
- * 2. OBTENER HISTORIAL (Versión Blindada)
- * Agregamos validación de propiedad para que ninguna empresa vea chats ajenos.
- */
 /**
  * 2. OBTENER HISTORIAL (Versión Final Blindada)
  * Filtra estrictamente por vacante y empresa para evitar fugas de datos.

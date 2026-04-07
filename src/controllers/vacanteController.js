@@ -95,7 +95,6 @@ export const listarVacantesPorEmpresa = async (req, res) => {
 };
 
 // 🟡 3. Listar todas las vacantes (Para el feed de estudiantes)
-// 🟡 3. Listar todas las vacantes (Busca esta sección en vacanteController.js)
 export const listarVacantes = async (req, res) => {
     try {
         const vacantes = await prisma.vacante.findMany({
@@ -104,9 +103,10 @@ export const listarVacantes = async (req, res) => {
                 empresa: true,
                 postulaciones: {
                     select: {
+                        id: true,       // <--- ¡FALTABA ESTA LÍNEA! Es el ID de la postulación
                         egresadoId: true,
-                        estado: true, // <--- ¡AQUÍ ESTÁ EL TRUCO! Agrega esta línea
-                        fecha: true   // Aprovechemos para traer la fecha real también
+                        estado: true, 
+                        fecha: true   
                     }
                 },
                 _count: {

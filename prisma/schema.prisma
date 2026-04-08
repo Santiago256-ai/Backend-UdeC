@@ -40,7 +40,7 @@ model PerfilCV {
   educacion   Educacion[]
   experiencia Experiencia[]
   idiomas     Idioma[]
-  egresado    Egresado      @relation(fields: [egresadoId], references: [id])
+  egresado    Egresado      @relation(fields: [egresadoId], references: [id], onDelete: Cascade)
   referencias Referencia[]
 }
 
@@ -146,23 +146,22 @@ model Postulacion {
   vacanteId  Int
   egresadoId Int
   notificaciones Notificacion[]
-  egresado   Egresado @relation(fields: [egresadoId], references: [id])
+  egresado   Egresado @relation(fields: [egresadoId], references: [id], onDelete: Cascade)
   vacante    Vacante  @relation(fields: [vacanteId], references: [id])
 
   @@unique([vacanteId, egresadoId])
 }
 
 model Mensaje {
-  id         Int      @id @default(autoincrement())
-  contenido  String
-  fechaEnvio DateTime @default(now())
-  read       Boolean  @default(false)
+  id          Int      @id @default(autoincrement())
+  contenido   String
+  fechaEnvio  DateTime @default(now())
+  read        Boolean  @default(false)
 
   // Indica quién envía: 'EMPRESA' o 'USUARIO' (Egresado)
   senderType String
 
-  // 1. EL FILTRO DE PRIVACIDAD: Todo mensaje pertenece a una vacante.
-  // Como la vacante pertenece a una empresa, esto aísla los chats.
+  // 1. EL FILTRO DE PRIVACIDAD
   vacanteId Int
   vacante   Vacante @relation(fields: [vacanteId], references: [id], onDelete: Cascade)
 
@@ -170,16 +169,14 @@ model Mensaje {
   senderEmpresaId Int?
   senderEmpresa   Empresa? @relation("EmpresaSentMessages", fields: [senderEmpresaId], references: [id])
 
+  // Cambiamos esta relación para que si se borra el Egresado, se borre el mensaje enviado
   senderEgresadoId Int?
-  senderEgresado   Egresado? @relation("SentMessages", fields: [senderEgresadoId], references: [id])
+  senderEgresado   Egresado? @relation("SentMessages", fields: [senderEgresadoId], references: [id], onDelete: Cascade)
 
   // 3. RECEPTOR (Egresado)
-  // Nota: Para que Prisma no te dé error, vinculamos el receiverId al Egresado.
-  // En la lógica de tu chat, si el receptor es la empresa, el receiverId 
-  // será el ID de la empresa (aunque Prisma lo vea vinculado al modelo Egresado, 
-  // tú lo manejas por lógica de negocio en el Backend).
+  // Cambiamos esta relación para que si se borra el Egresado (receptor), se borre el historial
   receiverId Int
-  receiver   Egresado @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  receiver   Egresado @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
 
   // 4. OTROS
   notificacion Notificacion?
@@ -202,5 +199,5 @@ model Notificacion {
   // -------------------
 
   egresadoId   Int
-  egresado     Egresado     @relation(fields: [egresadoId], references: [id])
+  egresado     Egresado     @relation(fields: [egresadoId], references: [id], onDelete: Cascade)
 }

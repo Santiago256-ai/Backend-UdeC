@@ -25,6 +25,7 @@ model Egresado {
   notificaciones    Notificacion[]
   cv                PerfilCV?
   postulaciones     Postulacion[]
+  estado    String   @default("ACTIVO")
 }
 
 model PerfilCV {

@@ -39,26 +39,54 @@ export const eliminarEgresado = async (req, res) => {
 };
 
 // ✅ Nueva función para que el Admin edite cualquier campo del egresado
+// ✅ Función para que el Admin actualice los datos y el ESTADO del egresado
 export const actualizarEgresadoAdmin = async (req, res) => {
     try {
         const { id } = req.params;
-        const { nombres, apellidos, correo, celular, facultad, programa } = req.body;
+        
+        // 1. Extraemos todos los campos, incluyendo el nuevo campo 'estado'
+        const { 
+            nombres, 
+            apellidos, 
+            correo, 
+            celular, 
+            facultad, 
+            programa,
+            estado 
+        } = req.body;
 
+        // 2. Ejecutamos la actualización en la base de datos
         const actualizado = await prisma.egresado.update({
-            where: { id: parseInt(id) },
+            where: { 
+                id: parseInt(id) 
+            },
             data: {
                 nombres,
                 apellidos,
                 correo,
                 celular,
                 facultad,
-                programa
+                programa,
+                estado // 👈 Ahora 'estado' sí está definido
             }
         });
 
-        res.json({ message: "Expediente actualizado con éxito", usuario: actualizado });
+        // 3. Respondemos con éxito
+        res.json({ 
+            message: "Expediente actualizado con éxito", 
+            usuario: actualizado 
+        });
+
     } catch (error) {
         console.error("Error al actualizar egresado:", error);
-        res.status(500).json({ error: "No se pudo actualizar el expediente." });
+        
+        // Manejo de error específico por si el ID no existe
+        if (error.code === 'P2025') {
+            return res.status(404).json({ error: "El egresado no fue encontrado." });
+        }
+
+        res.status(500).json({ 
+            error: "No se pudo actualizar el expediente en la base de datos." 
+        });
     }
 };

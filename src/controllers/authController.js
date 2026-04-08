@@ -16,9 +16,6 @@ const prisma = new PrismaClient();
 // =========================================================
 // REGISTRO DE EGRESADOS
 // =========================================================
-// =========================================================
-// REGISTRO DE EGRESADOS (CORREGIDO)
-// =========================================================
 export const register = async (req, res) => {
   try {
     // 1. Extraemos TODOS los campos que envía el formulario
@@ -43,7 +40,8 @@ export const register = async (req, res) => {
         // 🟢 ESTOS SON LOS QUE FALTABAN:
         facultad,
         programa,
-        celular 
+        celular,
+        estado: "ACTIVO"
       },
     });
 
@@ -60,17 +58,24 @@ export const register = async (req, res) => {
 export const login = async (req, res) => {
   try {
     const { correo, password } = req.body;
-
-    // ✅ NORMALIZAR EL BUSCADOR
     const identificador = correo.toLowerCase();
 
-    // 1. Buscar en Egresado usando el identificador normalizado
+    // 1. Buscar en Egresado
     let egresado = await prisma.egresado.findUnique({ where: { correo: identificador } });
     
     if (egresado) {
+        // 🟢 NUEVO: VALIDACIÓN DE ESTADO INACTIVO
+        if (egresado.estado === "INACTIVO") {
+            return res.status(200).json({ 
+                success: false, 
+                message: "Tu cuenta ha sido desactivada por el administrador. Contacta con la Universidad." 
+            });
+        }
+
         if (!egresado.password) {
             return res.status(200).json({ success: false, message: "Inicia sesión con Google." });
         }
+
         const passwordValida = await bcrypt.compare(password, egresado.password);
         if (!passwordValida) return res.status(200).json({ success: false, message: "Contraseña incorrecta" });
 

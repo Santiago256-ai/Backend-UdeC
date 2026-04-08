@@ -26,6 +26,8 @@ model Egresado {
   cv                PerfilCV?
   postulaciones     Postulacion[]
   estado    String   @default("ACTIVO")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 }
 
 model PerfilCV {

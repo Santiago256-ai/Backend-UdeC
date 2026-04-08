@@ -12,7 +12,7 @@ export const obtenerTodosLosEgresados = async (req, res) => {
                     select: { postulaciones: true }
                 }
             },
-            orderBy: { id: "desc" }
+            orderBy: { createdAt: "desc" }
         });
 
         res.json(egresados);
@@ -44,7 +44,8 @@ export const actualizarEgresadoAdmin = async (req, res) => {
     try {
         const { id } = req.params;
         
-        // 1. Extraemos todos los campos, incluyendo el nuevo campo 'estado'
+        // 1. Extraemos todos los campos del cuerpo de la petición
+        // Ponemos estado = "ACTIVO" como fallback por seguridad
         const { 
             nombres, 
             apellidos, 
@@ -52,10 +53,10 @@ export const actualizarEgresadoAdmin = async (req, res) => {
             celular, 
             facultad, 
             programa,
-            estado 
+            estado = "ACTIVO" 
         } = req.body;
 
-        // 2. Ejecutamos la actualización en la base de datos
+        // 2. Ejecutamos la actualización en la base de datos (Neon/Prisma)
         const actualizado = await prisma.egresado.update({
             where: { 
                 id: parseInt(id) 
@@ -67,11 +68,11 @@ export const actualizarEgresadoAdmin = async (req, res) => {
                 celular,
                 facultad,
                 programa,
-                estado // 👈 Ahora 'estado' sí está definido
+                estado // 👈 Actualiza el estado (ACTIVO/INACTIVO)
             }
         });
 
-        // 3. Respondemos con éxito
+        // 3. Respondemos con éxito y el objeto actualizado
         res.json({ 
             message: "Expediente actualizado con éxito", 
             usuario: actualizado 
@@ -80,13 +81,15 @@ export const actualizarEgresadoAdmin = async (req, res) => {
     } catch (error) {
         console.error("Error al actualizar egresado:", error);
         
-        // Manejo de error específico por si el ID no existe
+        // Error P2025: Prisma lanza esto si el registro no existe
         if (error.code === 'P2025') {
-            return res.status(404).json({ error: "El egresado no fue encontrado." });
+            return res.status(404).json({ 
+                error: "El egresado no fue encontrado en la base de datos." 
+            });
         }
 
         res.status(500).json({ 
-            error: "No se pudo actualizar el expediente en la base de datos." 
+            error: "No se pudo actualizar el expediente. Inténtalo de nuevo." 
         });
     }
 };

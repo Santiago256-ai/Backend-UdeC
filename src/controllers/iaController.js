@@ -4,9 +4,11 @@ import { z } from 'zod';
 import prisma from '../prismaClient.js';
 
 // 1. CONFIGURACIÓN DEL PROVEEDOR
-// Esto fuerza al SDK a usar la configuración limpia de tu API Key
+// Esto fuerza al SDK a usar tu API Key limpia.
 const google = createGoogleGenerativeAI({
     apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+    // TRUCO DE EMERGENCIA: Si el error de "v1beta" persiste, quita las barras "//" de la siguiente línea:
+    // baseURL: 'https://generativelanguage.googleapis.com/v1',
 });
 
 // 2. DEFINICIÓN DE HERRAMIENTAS (TOOLS)
@@ -46,7 +48,7 @@ export const procesarConsultaAgente = async (req, res) => {
         const { prompt } = req.body;
 
         const result = await generateText({
-            // Usamos el ID del modelo sin el prefijo 'models/' ya que el provider lo maneja
+            // Usamos el ID exacto de la versión estable de producción
             model: google('gemini-1.5-flash-001'),
             
             // Instrucciones del sistema
@@ -68,11 +70,11 @@ export const procesarConsultaAgente = async (req, res) => {
     } catch (error) {
         console.error("Error en el Agente IA:", error);
         
-        // Mantenemos el error detallado para debuggear en el navegador
+        // Mantenemos el error detallado para debuggear en el navegador si algo falla
         res.status(500).json({ 
             error: error.message, 
             stack: error.stack,
-            detalle: "Error tras forzar configuración del provider" 
+            detalle: "Fallo con el modelo gemini-1.5-flash-001" 
         });
     }
 };

@@ -19,7 +19,7 @@
     "@prisma/client": "^6.17.0",
     "@react-oauth/google": "^0.12.2",
     "@supabase/supabase-js": "^2.89.0",
-    "ai": "^6.0.161",
+    "ai": "^6.0.162",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",

@@ -95,29 +95,39 @@ const tools = {
 // ==========================================
 // 2. CONTROLADOR PRINCIPAL DEL AGENTE
 // ==========================================
+// 2. CONTROLADOR PRINCIPAL DEL AGENTE
 export const procesarConsultaAgente = async (req, res) => {
     try {
         const { prompt } = req.body;
 
-        const { text, steps } = await generateText({
+        // Añadimos 'toolResults' para capturar los datos crudos por si la IA se queda callada
+        const { text, steps, toolResults } = await generateText({
             model: google('gemini-2.5-flash'),
             system: `Eres el Asistente Inteligente del Portal de Empleo de la Universidad de Cundinamarca (UdeC).
 
 REGLAS ESTRICTAS DE COMPORTAMIENTO:
-1. TIENES acceso a la base de datos a través de tus herramientas. NUNCA digas que no puedes buscar información, consultar egresados o ver estadísticas.
-2. Si un usuario pregunta "¿Qué egresados tienen habilidades en X?": Ejecuta 'consultarEgresados'. OBLIGATORIAMENTE debes responder redactando la lista de los nombres, apellidos y programas de las personas que devuelva la herramienta.
-3. Si un usuario pregunta "¿Cuántas postulaciones hay para la vacante Y?": Ejecuta 'contarPostulacionesVacante'. OBLIGATORIAMENTE menciona el número exacto que te devuelva la herramienta.
-4. Si la herramienta devuelve un error o un array vacío [], responde educadamente: "No encontré registros que coincidan exactamente con tu búsqueda, ¿podrías intentar con otra palabra clave?".
-5. Tu respuesta final NUNCA debe estar en blanco. Siempre resume los datos obtenidos de las herramientas en un lenguaje natural y profesional.`,
+1. TIENES acceso a la base de datos a través de tus herramientas. NUNCA digas que no puedes buscar información.
+2. Si un usuario pregunta "¿Qué egresados tienen habilidades en X?": Ejecuta 'consultarEgresados' y OBLIGATORIAMENTE redacta una lista con los nombres.
+3. Si un usuario pregunta "¿Cuántas postulaciones hay para la vacante Y?": Ejecuta 'contarPostulacionesVacante' y da el número exacto.
+4. Tu respuesta final NUNCA debe estar en blanco. Siempre resume los datos obtenidos.`,
             prompt: prompt,
             tools: tools,
-            maxSteps: 5, // Vital: Permite el ciclo [Pensar -> Usar Herramienta -> Analizar Datos -> Responder]
+            maxSteps: 5,
         });
 
-        console.log(`🤖 Agente IA terminó su proceso en ${steps.length} paso(s).`);
+        console.log(`🤖 Agente IA terminó su proceso en ${steps?.length || 1} paso(s).`);
 
-        // Validación de seguridad para asegurar que el frontend siempre reciba un string
-        const respuestaFinal = text || "He procesado tu solicitud en la base de datos, pero hubo un problema al redactar la respuesta. Por favor, intenta reformular tu pregunta.";
+        let respuestaFinal = text;
+
+        // 🛡️ EL SALVAVIDAS: Si el texto está vacío pero Prisma sí devolvió datos, mostramos los datos crudos.
+        if (!respuestaFinal && toolResults && toolResults.length > 0) {
+            console.log("⚠️ La IA no resumió el texto. Forzando la salida de datos crudos.");
+            // Extraemos la información que encontró Prisma en el Paso 1
+            const datosEncontrados = toolResults[0].result;
+            respuestaFinal = "Encontré estos datos en el sistema:\n\n" + JSON.stringify(datosEncontrados, null, 2);
+        } else if (!respuestaFinal) {
+            respuestaFinal = "He procesado tu solicitud, pero no encontré coincidencias en la base de datos.";
+        }
 
         res.json({ respuesta: respuestaFinal });
 

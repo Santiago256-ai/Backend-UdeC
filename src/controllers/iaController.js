@@ -38,15 +38,22 @@ export const procesarConsultaAgente = async (req, res) => {
   try {
     const { prompt } = req.body;
 
-    const result = await generateText({
-      model: google('models/gemini-1.5-flash'), // Versión gratuita y rápida
-      system: `Eres el Agente de IA del Portal de Empleo UdeC. 
-               Tu objetivo es ayudar a empresas a encontrar egresados de la Universidad de Cundinamarca.
-               Usa un tono profesional y amable. Solo usa las herramientas disponibles.`,
-      tools: tools,
-      maxSteps: 5, // Permite que la IA use herramientas y luego responda
-      prompt: prompt,
-    });
+    // Dentro de procesarConsultaAgente...
+
+const result = await generateText({
+  // CAMBIO 1: Asegúrate de que diga exactamente esto:
+  model: google('gemini-1.5-flash'), 
+  
+  // CAMBIO 2: Agreguemos esto para ver qué está pasando si falla
+  onStepFinish: (step) => {
+    console.log("Paso completado:", step.text);
+  },
+
+  system: `Eres el Agente de IA del Portal de Empleo UdeC. 
+           Tu objetivo es ayudar a empresas a encontrar egresados.`,
+  prompt: prompt,
+  // tools: tools, // OPCIONAL: Comenta esta línea temporalmente para probar si el error es de Gemini o de tus herramientas
+});
 
     res.json({ respuesta: result.text });
   } catch (error) {

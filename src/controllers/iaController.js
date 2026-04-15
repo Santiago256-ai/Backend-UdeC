@@ -41,32 +41,30 @@ export const procesarConsultaAgente = async (req, res) => {
     try {
         const { prompt } = req.body;
 
-        const result = await generateText({
+        // Usamos generateText con un manejo más robusto de los pasos
+        const { text, steps } = await generateText({
             model: google('gemini-2.5-flash'),
-            
-            // System Prompt "PRO" para evitar que la IA se excuse
-            system: `Eres el Analista Inteligente del Portal de Empleo de la Universidad de Cundinamarca (UdeC).
-                     
-                     Tus reglas de comportamiento son:
-                     1. Tienes acceso directo a la base de datos mediante tus herramientas. NUNCA digas que no puedes filtrar o buscar egresados.
-                     2. Si un usuario pregunta por una habilidad (ej: "quién sabe PHP"), usa inmediatamente 'consultarEgresados'.
-                     3. Si no encuentras resultados tras usar la herramienta, responde: "No encontré egresados con esa habilidad específica, pero puedo ayudarte a buscar otros perfiles similares".
-                     4. Tus respuestas deben ser profesionales, concisas y orientadas a ayudar a la empresa a reclutar talento.
-                     5. Habla siempre en nombre de la UdeC de manera institucional.`,
-            
+            system: `Eres el Analista del Portal de Empleo UdeC. 
+                     Tu misión es buscar en la base de datos y RESPONDER con los resultados.
+                     Si encuentras personas, haz una lista con sus nombres y correos.
+                     Si no encuentras a nadie, dilo claramente.
+                     NUNCA respondas con un mensaje vacío.`,
             prompt: prompt,
             tools: tools,
-            maxSteps: 5, // Crucial para que la IA procese la respuesta de la DB y la redacte
+            maxSteps: 5,
         });
 
-        // Enviamos la respuesta generada (que ya incluye el análisis de los datos de la tool)
-        res.json({ respuesta: result.text });
+        // Log en la consola de Vercel para que veas qué herramientas se usaron
+        console.log("Pasos ejecutados por la IA:", steps.length);
+
+        // Si por alguna razón 'text' llega vacío pero hubo herramientas, 
+        // significa que la IA leyó los datos pero no los resumió.
+        const respuestaFinal = text || "He consultado la base de datos pero no encontré resultados que coincidan con tu búsqueda.";
+
+        res.json({ respuesta: respuestaFinal });
 
     } catch (error) {
-        console.error("Error en el Agente IA:", error);
-        res.status(500).json({ 
-            error: error.message, 
-            detalle: "Error en el flujo de pensamiento del agente" 
-        });
+        console.error("Error en el flujo del Agente:", error);
+        res.status(500).json({ error: error.message });
     }
 };

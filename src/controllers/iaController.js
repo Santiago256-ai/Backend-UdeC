@@ -39,7 +39,7 @@ export const procesarConsultaAgente = async (req, res) => {
     const { prompt } = req.body;
 
     const result = await generateText({
-      model: google('gemini-1.5-flash'), // Versión gratuita y rápida
+      model: google('models/gemini-1.5-flash'), // Versión gratuita y rápida
       system: `Eres el Agente de IA del Portal de Empleo UdeC. 
                Tu objetivo es ayudar a empresas a encontrar egresados de la Universidad de Cundinamarca.
                Usa un tono profesional y amable. Solo usa las herramientas disponibles.`,

@@ -33,30 +33,30 @@ const tools = {
   })
 };
 
+// ... otros imports
+
 export const procesarConsultaAgente = async (req, res) => {
   try {
     const { prompt } = req.body;
 
     const result = await generateText({
-      // MODIFICACIÓN AQUÍ:
-      // Agregamos '-latest' para forzar la compatibilidad con la API Key de Google AI Studio
-      // y evitar el error "not found for API version v1beta"
-      model: google('gemini-1.5-flash-latest'), 
+      // CAMBIO CLAVE: Usa este ID de modelo específico 
+      // y asegúrate de que no haya espacios extras.
+      model: google('models/gemini-1.5-flash-latest'), 
       
-      system: `Eres el Asistente del Portal de Empleo UdeC. 
-               Tu misión es ayudar a empresas y egresados a conectar.
-               Usa la información de la base de datos de forma profesional.`,
+      system: `Eres el Asistente del Portal de Empleo UdeC...`,
       prompt: prompt,
-      // tools: tools, // Déjalas comentadas solo en el primer deploy para probar conexión base
-      maxSteps: 5,
+      // ... resto de tu config
     });
 
     res.json({ respuesta: result.text });
+    
   } catch (error) {
+    // Si vuelve a fallar con el mismo error, intentaremos la "Opción B"
     res.status(500).json({ 
         error: error.message, 
         stack: error.stack,
-        detalle: "Error detectado por Gemini" 
+        detalle: "Error persistente en la versión de la API" 
     });
   }
 };

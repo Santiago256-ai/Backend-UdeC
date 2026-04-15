@@ -12,11 +12,13 @@
     "vercel-build": "prisma generate"
   },
   "dependencies": {
+    "@ai-sdk/google": "^3.0.63",
     "@azure/msal-browser": "^4.24.1",
     "@azure/msal-react": "^3.0.20",
     "@prisma/client": "^6.17.0",
     "@react-oauth/google": "^0.12.2",
     "@supabase/supabase-js": "^2.89.0",
+    "ai": "^6.0.161",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
@@ -25,7 +27,8 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.0.0",
     "nodemailer": "^8.0.4",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "nodemon": "^3.1.10",

@@ -1,7 +1,9 @@
 import express from 'express';
 const router = express.Router();
 import { procesarConsultaAgente } from '../controllers/iaController.js';
-import authMiddleware from '../middleware/authMiddleware.js'; // Para que solo usuarios logueados lo usen
+
+// CAMBIO AQUÍ: Agrega las llaves { } alrededor de authMiddleware
+import { authMiddleware } from '../middleware/authMiddleware.js'; 
 
 router.post('/consultar', authMiddleware, procesarConsultaAgente);
 

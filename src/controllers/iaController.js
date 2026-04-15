@@ -47,7 +47,7 @@ export const procesarConsultaAgente = async (req, res) => {
 
         const result = await generateText({
             // Usamos el ID del modelo sin el prefijo 'models/' ya que el provider lo maneja
-            model: google('gemini-1.5-flash'),
+            model: google('gemini-1.5-flash-001'),
             
             // Instrucciones del sistema
             system: `Eres el Asistente del Portal de Empleo de la Universidad de Cundinamarca (UdeC).

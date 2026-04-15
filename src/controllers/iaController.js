@@ -1,7 +1,7 @@
 import { google } from '@ai-sdk/google';
 import { generateText, tool } from 'ai';
 import { z } from 'zod';
-import prisma from "../prismaClient.js"; // Usamos tu cliente ya configurado
+import prisma from '../prismaClient.js';// Usamos tu cliente ya configurado
 
 // Definimos las "herramientas" que Gemini puede usar
 const tools = {

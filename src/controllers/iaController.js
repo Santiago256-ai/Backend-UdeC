@@ -1,15 +1,9 @@
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { google } from '@ai-sdk/google';
 import { generateText, tool } from 'ai';
 import { z } from 'zod';
 import prisma from '../prismaClient.js';
 
-// 1. PROVEEDOR LIMPIO
-// Usamos tu API Key nueva y dejamos que Vercel use la ruta v1beta por defecto.
-const google = createGoogleGenerativeAI({
-    apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-});
-
-// 2. HERRAMIENTAS (Tus herramientas están perfectas)
+// 1. DEFINICIÓN DE HERRAMIENTAS (TOOLS)
 const tools = {
     consultarEgresados: tool({
         description: 'Busca egresados por habilidades técnicas o carrera.',
@@ -40,26 +34,38 @@ const tools = {
     })
 };
 
-// 3. CONTROLADOR
+// 2. CONTROLADOR PRINCIPAL
 export const procesarConsultaAgente = async (req, res) => {
     try {
         const { prompt } = req.body;
 
         const result = await generateText({
-            // LA CLAVE DEL ÉXITO: Cambiamos a la versión PRO. 
-            // Es más potente y no tiene las restricciones regionales del Flash en la v1beta.
-            model: google('gemini-1.5-pro'),
+            // 🔥 EL ÚNICO CAMBIO QUE IMPORTABA 🔥
+            // Usamos la generación actual disponible en Google AI Studio
+            model: google('gemini-2.5-flash'),
             
-            system: `Eres el Asistente del Portal de Empleo de la Universidad de Cundinamarca (UdeC). Responde de forma amable, profesional y concisa.`,
+            // Instrucciones del sistema
+            system: `Eres el Asistente del Portal de Empleo de la Universidad de Cundinamarca (UdeC).
+                     Tu misión es ayudar a las empresas a analizar candidatos y ver estadísticas.
+                     Responde de forma amable, profesional y concisa.
+                     Si te preguntan por candidatos o vacantes, usa las herramientas disponibles.`,
+            
             prompt: prompt,
+            
+            // Herramientas activas
             tools: tools,
             maxSteps: 5, 
         });
 
+        // Enviamos la respuesta exitosa al frontend
         res.json({ respuesta: result.text });
 
     } catch (error) {
-        console.error("Error Crítico:", error);
-        res.status(500).json({ error: error.message });
+        console.error("Error en el Agente IA:", error);
+        
+        res.status(500).json({ 
+            error: error.message, 
+            detalle: "Fallo de servidor al contactar a Google" 
+        });
     }
 };

@@ -57,7 +57,11 @@ const result = await generateText({
 
     res.json({ respuesta: result.text });
   } catch (error) {
-    console.error("Error en Agente IA:", error);
-    res.status(500).json({ error: "El agente no pudo procesar la solicitud" });
-  }
+    // Esto nos dirá el error real en la respuesta JSON
+    res.status(500).json({ 
+        error: error.message, 
+        stack: error.stack,
+        detalle: "Revisa esto Gemini" 
+    });
+}
 };

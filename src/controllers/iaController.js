@@ -82,7 +82,7 @@ Tus herramientas son:
 REGLA DE ORO: Si recibes una pregunta, USA LA HERRAMIENTA CORRESPONDIENTE INMEDIATAMENTE. No te disculpes. Si la herramienta devuelve un texto, cópialo exactamente como tu respuesta final al usuario.`,
             prompt: prompt,
             tools: tools,
-            maxSteps: 5,
+            maxSteps: 0,
         });
 
         console.log(`🤖 Agente IA terminó su proceso en ${steps?.length || 1} paso(s).`);

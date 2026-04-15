@@ -4,90 +4,62 @@ import { z } from 'zod';
 import prisma from '../prismaClient.js';
 
 // ==========================================
-// 1. DEFINICIÓN DE HERRAMIENTAS (TOOLS)
+// 1. HERRAMIENTAS (Transforman los datos a TEXTO HUMANO)
 // ==========================================
 const tools = {
     // HERRAMIENTA A: Buscar Egresados por Habilidad/Carrera
     consultarEgresados: tool({
-        description: 'Usa esta herramienta cuando te pregunten por candidatos, egresados o personas con habilidades específicas (ej: PHP, React, Python) o de un programa académico.',
+        description: 'Usa esta herramienta cuando te pregunten por candidatos, egresados o personas con habilidades (ej: PHP, React) o de un programa.',
         parameters: z.object({
             filtro: z.string().describe('Palabra clave a buscar: habilidad, tecnología, o nombre de la carrera.')
         }),
         execute: async ({ filtro }) => {
             console.log(`🔍 IA Buscando Egresados con filtro: ${filtro}`);
-            
-            // Usamos la misma estructura de Egresado + PerfilCV de tu sistema
             const resultados = await prisma.egresado.findMany({
                 where: {
                     estado: 'ACTIVO',
                     OR: [
                         { nombres: { contains: filtro, mode: 'insensitive' } },
                         { programa: { contains: filtro, mode: 'insensitive' } },
-                        {
-                            cv: {
-                                OR: [
-                                    { habilidades: { contains: filtro, mode: 'insensitive' } },
-                                    { descripcion: { contains: filtro, mode: 'insensitive' } }
-                                ]
-                            }
-                        }
+                        { cv: { OR: [ { habilidades: { contains: filtro, mode: 'insensitive' } } ] } }
                     ]
                 },
-                select: {
-                    nombres: true,
-                    apellidos: true,
-                    correo: true,
-                    programa: true,
-                    cv: {
-                        select: { habilidades: true }
-                    }
-                }
+                select: { nombres: true, apellidos: true, correo: true, programa: true }
             });
-            return resultados;
+            
+            // 🔥 TRUCO: Formateamos el texto aquí mismo para que la IA no tenga que pensar
+            if (resultados.length === 0) return `No se encontraron egresados que coincidan con "${filtro}".`;
+            const lista = resultados.map(r => `• ${r.nombres} ${r.apellidos} | Programa: ${r.programa} | Contacto: ${r.correo}`).join('\n');
+            return `Encontré ${resultados.length} egresados con la habilidad o programa "${filtro}":\n\n${lista}`;
         }
     }),
 
     // HERRAMIENTA B: Ver Postulaciones de una Vacante Específica
     contarPostulacionesVacante: tool({
-        description: 'Usa esta herramienta cuando te pregunten cuántas personas se han postulado o aplicado a una vacante, empleo u oferta de trabajo específica.',
+        description: 'Usa esta herramienta cuando te pregunten cuántas personas se han postulado a una vacante específica.',
         parameters: z.object({
-            tituloVacante: z.string().describe('El título, cargo o nombre de la vacante, ej: Psicólogo en domicilio, Desarrollador, etc.')
+            tituloVacante: z.string().describe('El título de la vacante, ej: Psicólogo')
         }),
         execute: async ({ tituloVacante }) => {
             console.log(`🔍 IA Buscando Vacante: ${tituloVacante}`);
-            
-            // Usamos la relación _count que ya usas en vacanteController
             const vacante = await prisma.vacante.findFirst({
-                where: {
-                    titulo: { contains: tituloVacante, mode: 'insensitive' }
-                },
-                include: {
-                    _count: { select: { postulaciones: true } }
-                }
+                where: { titulo: { contains: tituloVacante, mode: 'insensitive' } },
+                include: { _count: { select: { postulaciones: true } } }
             });
 
-            if (!vacante) {
-                return { error: `No se encontró ninguna vacante con el título: ${tituloVacante}` };
-            }
-
-            return {
-                tituloExacto: vacante.titulo,
-                estadoDeVacante: vacante.estado,
-                totalPostulados: vacante._count.postulaciones
-            };
+            if (!vacante) return `No se encontró ninguna vacante con el título "${tituloVacante}".`;
+            return `La vacante "${vacante.titulo}" tiene exactamente ${vacante._count.postulaciones} postulaciones actualmente.`;
         }
     }),
 
     // HERRAMIENTA C: Estadísticas Generales
     verEstadisticasGlobales: tool({
-        description: 'Usa esta herramienta si te preguntan cuántas vacantes u ofertas hay publicadas o disponibles en total.',
+        description: 'Usa esta herramienta si te preguntan cuántas vacantes u ofertas hay publicadas en total.',
         parameters: z.object({}),
         execute: async () => {
             console.log(`🔍 IA Consultando total de vacantes abiertas`);
-            const total = await prisma.vacante.count({
-                where: { estado: 'ABIERTA' }
-            });
-            return { vacantesAbiertasEnElPortal: total };
+            const total = await prisma.vacante.count({ where: { estado: 'ABIERTA' } });
+            return `Actualmente el portal cuenta con un total de ${total} vacantes ABIERTAS.`;
         }
     })
 };
@@ -95,21 +67,14 @@ const tools = {
 // ==========================================
 // 2. CONTROLADOR PRINCIPAL DEL AGENTE
 // ==========================================
-// 2. CONTROLADOR PRINCIPAL DEL AGENTE
 export const procesarConsultaAgente = async (req, res) => {
     try {
         const { prompt } = req.body;
 
-        // Añadimos 'toolResults' para capturar los datos crudos por si la IA se queda callada
-        const { text, steps, toolResults } = await generateText({
+        const { text, steps } = await generateText({
             model: google('gemini-2.5-flash'),
-            system: `Eres el Asistente Inteligente del Portal de Empleo de la Universidad de Cundinamarca (UdeC).
-
-REGLAS ESTRICTAS DE COMPORTAMIENTO:
-1. TIENES acceso a la base de datos a través de tus herramientas. NUNCA digas que no puedes buscar información.
-2. Si un usuario pregunta "¿Qué egresados tienen habilidades en X?": Ejecuta 'consultarEgresados' y OBLIGATORIAMENTE redacta una lista con los nombres.
-3. Si un usuario pregunta "¿Cuántas postulaciones hay para la vacante Y?": Ejecuta 'contarPostulacionesVacante' y da el número exacto.
-4. Tu respuesta final NUNCA debe estar en blanco. Siempre resume los datos obtenidos.`,
+            system: `Eres el Asistente del Portal de Empleo UdeC.
+                     Obligatorio: Cuando uses una herramienta, simplemente repite exactamente la información que la herramienta te devolvió, sin alterar los datos. Si la herramienta te da una lista, muéstrala tal cual.`,
             prompt: prompt,
             tools: tools,
             maxSteps: 5,
@@ -119,14 +84,19 @@ REGLAS ESTRICTAS DE COMPORTAMIENTO:
 
         let respuestaFinal = text;
 
-        // 🛡️ EL SALVAVIDAS: Si el texto está vacío pero Prisma sí devolvió datos, mostramos los datos crudos.
-        if (!respuestaFinal && toolResults && toolResults.length > 0) {
-            console.log("⚠️ La IA no resumió el texto. Forzando la salida de datos crudos.");
-            // Extraemos la información que encontró Prisma en el Paso 1
-            const datosEncontrados = toolResults[0].result;
-            respuestaFinal = "Encontré estos datos en el sistema:\n\n" + JSON.stringify(datosEncontrados, null, 2);
-        } else if (!respuestaFinal) {
-            respuestaFinal = "He procesado tu solicitud, pero no encontré coincidencias en la base de datos.";
+        // 🛡️ EL SALVAVIDAS FINAL: Si el texto está vacío, extraemos el texto que nosotros mismos fabricamos en las tools
+        if (!respuestaFinal || respuestaFinal.trim() === "") {
+            console.log("⚠️ La IA se quedó callada. Activando el salvavidas...");
+            
+            // Extraemos los resultados de las herramientas que se usaron en los 'steps'
+            const resultadosHerramientas = steps.flatMap(s => s.toolResults || []);
+            
+            if (resultadosHerramientas.length > 0) {
+                // Unimos las oraciones limpias que nuestras tools generaron
+                respuestaFinal = resultadosHerramientas.map(tr => tr.result).join('\n\n');
+            } else {
+                respuestaFinal = "He procesado tu solicitud, pero no encontré datos específicos en la base de datos.";
+            }
         }
 
         res.json({ respuesta: respuestaFinal });
@@ -134,7 +104,7 @@ REGLAS ESTRICTAS DE COMPORTAMIENTO:
     } catch (error) {
         console.error("❌ ERROR EN IA CONTROLLER:", error);
         res.status(500).json({ 
-            error: "Hubo un error de conexión con el motor de Inteligencia Artificial.",
+            error: "Hubo un error de conexión con el motor de Inteligencia Artificial.", 
             detalle: error.message 
         });
     }

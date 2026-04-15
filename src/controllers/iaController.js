@@ -4,10 +4,9 @@ import { z } from 'zod';
 import prisma from '../prismaClient.js';
 
 // ==========================================
-// 1. HERRAMIENTAS (Transforman los datos a TEXTO HUMANO)
+// 1. HERRAMIENTAS (Retornan TEXTO DIRECTO)
 // ==========================================
 const tools = {
-    // HERRAMIENTA A: Buscar Egresados por Habilidad/Carrera
     consultarEgresados: tool({
         description: 'Usa esta herramienta cuando te pregunten por candidatos, egresados o personas con habilidades (ej: PHP, React) o de un programa.',
         parameters: z.object({
@@ -27,14 +26,12 @@ const tools = {
                 select: { nombres: true, apellidos: true, correo: true, programa: true }
             });
             
-            // 🔥 TRUCO: Formateamos el texto aquí mismo para que la IA no tenga que pensar
             if (resultados.length === 0) return `No se encontraron egresados que coincidan con "${filtro}".`;
             const lista = resultados.map(r => `• ${r.nombres} ${r.apellidos} | Programa: ${r.programa} | Contacto: ${r.correo}`).join('\n');
             return `Encontré ${resultados.length} egresados con la habilidad o programa "${filtro}":\n\n${lista}`;
         }
     }),
 
-    // HERRAMIENTA B: Ver Postulaciones de una Vacante Específica
     contarPostulacionesVacante: tool({
         description: 'Usa esta herramienta cuando te pregunten cuántas personas se han postulado a una vacante específica.',
         parameters: z.object({
@@ -52,7 +49,6 @@ const tools = {
         }
     }),
 
-    // HERRAMIENTA C: Estadísticas Generales
     verEstadisticasGlobales: tool({
         description: 'Usa esta herramienta si te preguntan cuántas vacantes u ofertas hay publicadas en total.',
         parameters: z.object({}),
@@ -65,47 +61,42 @@ const tools = {
 };
 
 // ==========================================
-// 2. CONTROLADOR PRINCIPAL DEL AGENTE
+// 2. CONTROLADOR (Extracción Directa)
 // ==========================================
 export const procesarConsultaAgente = async (req, res) => {
     try {
         const { prompt } = req.body;
 
-        const { text, steps } = await generateText({
+        // EXTRAEMOS toolResults DIRECTAMENTE DE LA RAÍZ
+        const { text, toolResults } = await generateText({
             model: google('gemini-2.5-flash'),
             system: `Eres el Asistente del Portal de Empleo UdeC.
-                     Obligatorio: Cuando uses una herramienta, simplemente repite exactamente la información que la herramienta te devolvió, sin alterar los datos. Si la herramienta te da una lista, muéstrala tal cual.`,
+                     Si usas una herramienta, muestra la información al usuario de forma amable.`,
             prompt: prompt,
             tools: tools,
             maxSteps: 5,
         });
 
-        console.log(`🤖 Agente IA terminó su proceso en ${steps?.length || 1} paso(s).`);
-
+        // 1. Asumimos que la IA hizo bien su trabajo y generó texto
         let respuestaFinal = text;
 
-        // 🛡️ EL SALVAVIDAS FINAL: Si el texto está vacío, extraemos el texto que nosotros mismos fabricamos en las tools
+        // 2. Si la IA se quedó en blanco (el bug de Vercel SDK)...
         if (!respuestaFinal || respuestaFinal.trim() === "") {
-            console.log("⚠️ La IA se quedó callada. Activando el salvavidas...");
             
-            // Extraemos los resultados de las herramientas que se usaron en los 'steps'
-            const resultadosHerramientas = steps.flatMap(s => s.toolResults || []);
-            
-            if (resultadosHerramientas.length > 0) {
-                // Unimos las oraciones limpias que nuestras tools generaron
-                respuestaFinal = resultadosHerramientas.map(tr => tr.result).join('\n\n');
+            // ...vamos directo a la raíz de toolResults (donde están los textos de Prisma)
+            if (toolResults && toolResults.length > 0) {
+                console.log("⚠️ Extrayendo resultado directo de Prisma...");
+                // Tomamos el string exacto que construimos arriba en las tools
+                respuestaFinal = toolResults[0].result;
             } else {
-                respuestaFinal = "He procesado tu solicitud, pero no encontré datos específicos en la base de datos.";
+                respuestaFinal = "Procesé tu consulta pero no encontré datos en el sistema.";
             }
         }
 
         res.json({ respuesta: respuestaFinal });
 
     } catch (error) {
-        console.error("❌ ERROR EN IA CONTROLLER:", error);
-        res.status(500).json({ 
-            error: "Hubo un error de conexión con el motor de Inteligencia Artificial.", 
-            detalle: error.message 
-        });
+        console.error("❌ ERROR EN IA:", error);
+        res.status(500).json({ error: "Hubo un error de conexión con la IA.", detalle: error.message });
     }
 };

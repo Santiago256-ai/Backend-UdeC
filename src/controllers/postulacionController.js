@@ -232,3 +232,64 @@ export const actualizarAnclajePostulacion = async (req, res) => {
         res.status(500).json({ error: "Error al actualizar el anclaje en el servidor" });
     }
 };
+
+// 🟢 NUEVO: Obtener todas las postulaciones de una empresa (Para TotalPostulaciones.jsx)
+export const obtenerPostulacionesPorEmpresa = async (req, res) => {
+    try {
+        const empresaId = parseInt(req.params.empresaId);
+
+        if (isNaN(empresaId)) {
+            return res.status(400).json({ error: "ID de empresa no válido." });
+        }
+
+        const postulaciones = await prisma.postulacion.findMany({
+            where: {
+                vacante: {
+                    empresaId: empresaId
+                }
+            },
+            include: {
+                egresado: {
+                    select: {
+                        nombres: true,
+                        apellidos: true,
+                        correo: true
+                    }
+                },
+                vacante: {
+                    select: {
+                        titulo: true
+                    }
+                }
+            },
+            orderBy: {
+                fecha: 'desc' // Mostrar las más recientes primero
+            }
+        });
+
+        res.json(postulaciones);
+    } catch (error) {
+        console.error("❌ Error en obtenerPostulacionesPorEmpresa:", error.message);
+        res.status(500).json({ error: "No se pudieron obtener las postulaciones." });
+    }
+};
+
+// 🔵 ACTUALIZADO: Calificar postulante (Seguimiento Admin)
+export const calificarPostulacion = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { calificacion, comentario } = req.body;
+
+        const actualizada = await prisma.postulacion.update({
+            where: { id: parseInt(id) },
+            data: {
+                calificacionAdmin: parseInt(calificacion),
+                comentarioAdmin: comentario
+            }
+        });
+
+        res.json({ message: "Calificación guardada", actualizada });
+    } catch (error) {
+        res.status(500).json({ error: "Error al calificar" });
+    }
+};

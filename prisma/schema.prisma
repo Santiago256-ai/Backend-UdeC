@@ -146,6 +146,9 @@ model Postulacion {
   anclado    Boolean  @default(false)
   chatActivo Boolean  @default(true)
   fecha      DateTime @default(now())
+  fechaActualizacion DateTime @updatedAt 
+  calificacionAdmin  Int?     @default(0)   
+  comentarioAdmin    String?
   vacanteId  Int
   egresadoId Int
   notificaciones Notificacion[]

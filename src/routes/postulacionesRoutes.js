@@ -4,9 +4,13 @@ import {
     crearPostulacion, 
     obtenerPostulacionesPorVacante,
     actualizarEstadoPostulacion,
-    actualizarAnclajePostulacion, // 1. IMPORTA LA NUEVA FUNCIÓN
+    actualizarAnclajePostulacion,
     obtenerDetallePostulacionesAdmin,
-    obtenerTodasLasPostulacionesAdmin
+    obtenerTodasLasPostulacionesAdmin,
+    // --- NUEVAS IMPORTACIONES ---
+    obtenerPostulacionesPorEmpresa, 
+    calificarPostulacion 
+    // ----------------------------
 } from "../controllers/postulacionController.js"; 
 
 const router = express.Router();
@@ -23,18 +27,26 @@ const upload = multer({
   },
 });
 
-// --- RUTAS DE POSTULACIÓN ---
+// --- RUTAS DE POSTULACIÓN (EGRESADOS Y EMPRESAS) ---
 
 router.get("/vacante/:vacanteId", obtenerPostulacionesPorVacante);
 router.post("/enviar", crearPostulacion);
 
-// 2. NUEVA RUTA: Actualizar solo el anclaje
-router.put("/:id/anclaje", actualizarAnclajePostulacion); 
+// --- RUTAS DE GESTIÓN (DASHBOARD EMPRESA) ---
 
-// 3. PUT: Actualizar el estado de una postulación
+// Obtiene todas las postulaciones de una empresa específica (Para la nueva tabla global)
+router.get("/empresa/:empresaId", obtenerPostulacionesPorEmpresa); 
+
+// Actualizar el estado de una postulación
 router.put("/:id/estado", actualizarEstadoPostulacion);
 
-// Perfil administrador
+// Actualizar solo el anclaje (favoritos)
+router.put("/:id/anclaje", actualizarAnclajePostulacion); 
+
+// Nueva ruta para que la empresa califique al egresado (Seguimiento Admin)
+router.put("/calificar/:id", calificarPostulacion);
+
+// --- PERFIL ADMINISTRADOR (UdeC) ---
 router.get("/admin/detalle-completo/:vacanteId", obtenerDetallePostulacionesAdmin);
 router.get("/admin/todas", obtenerTodasLasPostulacionesAdmin);
 

@@ -38,7 +38,7 @@ model PerfilCV {
   programa    String?
   direccion   String?
   descripcion String?
-  habilidades String?
+  habilidades Json?
   aptitudes   Aptitud[]
   educacion   Educacion[]
   experiencia Experiencia[]

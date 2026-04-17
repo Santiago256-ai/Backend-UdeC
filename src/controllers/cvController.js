@@ -50,6 +50,13 @@ export const upsertCV = async (req, res) => {
                 nivel: parseInt(i.nivel) || 0 
             }));
 
+            const habLimpia = (data.habilidades || [])
+            .filter(h => h.nombre && h.nombre.trim() !== "")
+            .map(h => ({
+                nombre: h.nombre,
+                nivel: parseInt(h.nivel) || 0
+            }));
+
         const cvGuardado = await prisma.perfilCV.upsert({
             where: { egresadoId: egresadoId },
             update: {
@@ -57,7 +64,7 @@ export const upsertCV = async (req, res) => {
                 
                 direccion: data.direccion || "",
                 descripcion: data.descripcion || "",
-                habilidades: data.habilidades || "",
+                habilidades: habLimpia,
                 experiencia: { deleteMany: {}, create: expLimpia },
                 educacion: { deleteMany: {}, create: eduLimpia },
                 referencias: { deleteMany: {}, create: refLimpia },
@@ -70,7 +77,7 @@ export const upsertCV = async (req, res) => {
     
     direccion: data.direccion || "",
     descripcion: data.descripcion || "",
-    habilidades: data.habilidades || "",
+    habilidades: habLimpia,
     // IMPORTANTE: Asegúrate de incluir las relaciones también en el create
     experiencia: { create: expLimpia },
     educacion: { create: eduLimpia },

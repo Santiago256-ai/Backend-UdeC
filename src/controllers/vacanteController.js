@@ -123,6 +123,7 @@ export const listarVacantes = async (req, res) => {
 };
 
 // 🔴 4. Eliminar una vacante por ID
+// 🔴 4. Eliminar una vacante por ID (CORREGIDO PARA BORRAR EN CASCADA)
 export const eliminarVacante = async (req, res) => {
     try {
         const { id } = req.params;
@@ -140,17 +141,23 @@ export const eliminarVacante = async (req, res) => {
             return res.status(404).json({ error: "Vacante no encontrada." });
         }
 
-        // Primero eliminamos la vacante (Prisma se encarga si hay Cascade, 
-        // de lo contrario asegúrate de que no haya postulaciones huérfanas)
+        // 🔥 PASO CRÍTICO: Eliminar primero todas las postulaciones asociadas
+        // Esto evita el error de "Foreign key constraint" (Error 500)
+        await prisma.postulacion.deleteMany({
+            where: { vacanteId: idNumerico }
+        });
+
+        // Ahora que la vacante está "sola", podemos eliminarla
         await prisma.vacante.delete({
             where: { id: idNumerico },
         });
 
-        console.log("🗑️ Vacante eliminada:", id);
+        console.log("🗑️ Vacante y sus postulaciones eliminadas:", id);
         res.json({ message: "Vacante eliminada correctamente." });
+
     } catch (error) {
-        console.error("❌ Error al eliminar vacante:", error);
-        res.status(500).json({ error: "Error interno al eliminar vacante." });
+        console.error("❌ Error al eliminar vacante:", error.message);
+        res.status(500).json({ error: "Error interno al eliminar vacante.", detalle: error.message });
     }
 };
 

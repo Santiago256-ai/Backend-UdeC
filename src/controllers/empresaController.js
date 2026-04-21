@@ -123,16 +123,18 @@ export const loginEmpresa = async (req, res) => {
             where: { email: correoABuscar },
         });
 
+        // Verificamos si existe la empresa
         if (!empresa) {
             return res.status(401).json({ error: "Credenciales incorrectas." });
         }
 
-        // 🛑 NUEVO: VALIDACIÓN DE ESTADO INACTIVO (Bloqueo de acceso)
-        // Si el admin puso la empresa en INACTIVO, no la dejamos pasar
+        // 🛑 VALIDACIÓN DE ESTADO (El muro de seguridad)
+        // Usamos status 403 (Prohibido) para que el frontend sepa que el acceso está denegado por el Admin
         if (empresa.estado === "INACTIVO") {
-            return res.status(200).json({ 
+            return res.status(403).json({ 
                 success: false, 
-                message: "Esta cuenta de empresa ha sido desactivada por la administración de la UdeC. Por favor, contacte con soporte." 
+                error: "Cuenta desactivada",
+                message: "Esta cuenta de empresa ha sido desactivada por la administración de la UdeC. Por favor, contacte con soporte institucional." 
             });
         }
 
@@ -153,6 +155,7 @@ export const loginEmpresa = async (req, res) => {
         // 7. Devolver respuesta exitosa (sin el hash de la contraseña)
         const { password: _, ...empresaData } = empresa;
 
+        // Si todo está OK, enviamos el éxito
         res.status(200).json({
             success: true,
             message: "Inicio de sesión exitoso",

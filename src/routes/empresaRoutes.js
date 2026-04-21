@@ -3,7 +3,6 @@ import { authMiddleware } from "../middleware/authMiddleware.js"; // 👈 Nombre
 import { 
     crearEmpresa, 
     listarEmpresas, 
-    loginEmpresa,
     obtenerEmpresasParaAdmin,
     eliminarEmpresaAdmin,
     obtenerPerfilEmpresa, // 👈 Agregar
@@ -15,7 +14,6 @@ const router = Router();
 
 router.post("/", crearEmpresa);
 router.get("/", listarEmpresas);
-router.post("/login", loginEmpresa); 
 
 // 🚀 NUEVAS RUTAS PARA EL PERFIL
 // GET /api/empresas/:id -> Para cargar el perfil

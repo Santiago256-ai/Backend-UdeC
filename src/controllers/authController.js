@@ -94,9 +94,19 @@ export const login = async (req, res) => {
     }
 
     // 2. Buscar en Empresa usando el identificador normalizado
+// 2. Buscar en Empresa usando el identificador normalizado
     const empresa = await prisma.empresa.findUnique({ where: { email: identificador } });
 
     if (empresa) {
+        // 🛑 ¡AQUÍ ESTÁ EL MURO DE SEGURIDAD! 🛑
+        // Bloqueamos el paso antes de validar la contraseña
+        if (empresa.estado === "INACTIVO") {
+            return res.status(200).json({ 
+                success: false, 
+                message: "Tu cuenta de empresa ha sido desactivada por el administrador. Contacta con la Universidad." 
+            });
+        }
+
         const passwordValida = await bcrypt.compare(password, empresa.password);
         if (!passwordValida) return res.status(200).json({ success: false, message: "Contraseña incorrecta" });
 

@@ -110,15 +110,15 @@ export const loginEmpresa = async (req, res) => {
         // 1. Extraemos los datos del body
         const { identificador, contraseña: password } = req.body; 
 
-        // 2. Validamos que existan antes de transformar
+        // 2. Validamos que existan
         if (!identificador || !password) {
             return res.status(400).json({ error: "Faltan credenciales (email y password)." });
         }
 
-        // 3. Ahora sí, normalizamos usando 'identificador'
+        // 3. Normalizamos el identificador
         const correoABuscar = identificador.toLowerCase().trim();
 
-        // 1. Buscar la empresa por email
+        // 4. Buscar la empresa por email
         const empresa = await prisma.empresa.findUnique({
             where: { email: correoABuscar },
         });
@@ -127,29 +127,39 @@ export const loginEmpresa = async (req, res) => {
             return res.status(401).json({ error: "Credenciales incorrectas." });
         }
 
-        // 2. Comparar la contraseña ingresada con el hash guardado
+        // 🛑 NUEVO: VALIDACIÓN DE ESTADO INACTIVO (Bloqueo de acceso)
+        // Si el admin puso la empresa en INACTIVO, no la dejamos pasar
+        if (empresa.estado === "INACTIVO") {
+            return res.status(200).json({ 
+                success: false, 
+                message: "Esta cuenta de empresa ha sido desactivada por la administración de la UdeC. Por favor, contacte con soporte." 
+            });
+        }
+
+        // 5. Comparar la contraseña ingresada con el hash guardado
         const passwordMatch = await bcrypt.compare(password, empresa.password);
 
         if (!passwordMatch) {
             return res.status(401).json({ error: "Credenciales incorrectas." });
         }
 
-        // 3. Generar el Token Web JSON (JWT)
+        // 6. Generar el Token Web JSON (JWT)
         const token = jwt.sign(
-            { id: empresa.id, email: empresa.email, rol: 'empresa' }, // Payload
+            { id: empresa.id, email: empresa.email, rol: 'empresa' },
             JWT_SECRET,
             { expiresIn: '1d' } 
         );
 
-        // 4. Devolver respuesta exitosa (sin el hash de la contraseña)
+        // 7. Devolver respuesta exitosa (sin el hash de la contraseña)
         const { password: _, ...empresaData } = empresa;
 
         res.status(200).json({
+            success: true,
             message: "Inicio de sesión exitoso",
             token,
             usuario: { 
                 ...empresaData,
-                rol: 'empresa' // ⬅️ CLAVE: Devuelve el rol para que el frontend pueda redireccionar
+                rol: 'empresa' 
             }
         });
 
@@ -179,25 +189,27 @@ export const listarEmpresas = async (req, res) => {
     }
 };
 
-// backend/controllers/empresaController.js
-
-// 🟢 NUEVO: Función exclusiva para el Panel Administrativo
+// 🟢 NUEVO: Función exclusiva para el Panel Administrativo (Empresas)
 export const obtenerEmpresasParaAdmin = async (req, res) => {
     try {
         const empresas = await prisma.empresa.findMany({
             include: {
                 _count: {
-                    select: { vacantes: true } // Esto nos da el número de vacantes publicadas
+                    select: { vacantes: true } // Mantiene el conteo de vacantes publicadas
                 }
             },
-            orderBy: { nombre: "asc" } // Ordenadas alfabéticamente
+            // 🕒 CAMBIO CRÍTICO: Ordenar por fecha de creación (más recientes primero)
+            // Esto es vital para que coincida con el comportamiento de 'Egresados'
+            orderBy: { createdAt: "desc" } 
         });
 
-        // Enviamos los datos (Prisma ya omite campos si no los pedimos, pero aquí mandamos todo lo necesario)
+        // Enviamos los datos completos (Prisma traerá automáticamente 'estado' y 'createdAt')
         res.json(empresas);
     } catch (error) {
         console.error("❌ Error en obtenerEmpresasParaAdmin:", error);
-        res.status(500).json({ error: "No se pudo cargar la lista de empresas aliadas." });
+        res.status(500).json({ 
+            error: "No se pudo cargar la lista de empresas aliadas. Verifique la conexión con la base de datos." 
+        });
     }
 };
 
@@ -287,5 +299,23 @@ export const actualizarEmpresa = async (req, res) => {
         }
 
         res.status(500).json({ error: "No se pudo actualizar la información en el servidor." });
+    }
+};
+
+// 🟢 NUEVO: Cambiar estado (Activo/Inactivo) desde la tabla de Admin
+export const actualizarEstadoEmpresaAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { estado } = req.body; // Recibe "ACTIVO" o "INACTIVO"
+
+        const actualizada = await prisma.empresa.update({
+            where: { id: parseInt(id) },
+            data: { estado }
+        });
+
+        res.json({ message: "Estado de empresa actualizado", empresa: actualizada });
+    } catch (error) {
+        console.error("❌ Error al cambiar estado de empresa:", error);
+        res.status(500).json({ error: "No se pudo cambiar el estado." });
     }
 };

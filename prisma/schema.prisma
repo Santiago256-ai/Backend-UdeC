@@ -116,6 +116,8 @@ model Empresa {
   createdAt            DateTime  @default(now())
   mensajesEnviados     Mensaje[] @relation("EmpresaSentMessages")
   vacantes             Vacante[]
+  estado          String     @default("ACTIVO")
+  updatedAt       DateTime   @default(now()) @updatedAt
 }
 
 model Vacante {

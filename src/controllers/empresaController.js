@@ -118,21 +118,25 @@ export const loginEmpresa = async (req, res) => {
         // 3. Normalizamos el identificador
         const correoABuscar = identificador.toLowerCase().trim();
 
-        // 4. Buscar la empresa por email
+        // 4. Buscar la empresa por email (Aseguramos que traiga el estado)
         const empresa = await prisma.empresa.findUnique({
-            where: { email: correoABuscar },
+            where: { email: correoABuscar }
         });
 
         // Verificamos si existe la empresa
         if (!empresa) {
             return res.status(401).json({ error: "Credenciales incorrectas." });
         }
-// Temporal para depurar
-console.log("¿Qué estado lee el servidor?:", empresa.estado);
-console.log("Objeto empresa completo:", JSON.stringify(empresa));
+
+        // 🔍 LOGS CRÍTICOS PARA VERCEL (Revisa esto en el Dashboard de Vercel > Logs)
+        console.log("--- INTENTO DE LOGIN ---");
+        console.log("Empresa encontrada:", empresa.nombre);
+        console.log("Estado en BD:", empresa.estado);
+
         // 🛑 VALIDACIÓN DE ESTADO (El muro de seguridad)
-        // Usamos status 403 (Prohibido) para que el frontend sepa que el acceso está denegado por el Admin
+        // Usamos exactamente "INACTIVO" en mayúsculas como aparece en tu imagen de la BD
         if (empresa.estado === "INACTIVO") {
+            console.log("Acceso DENEGADO por estado INACTIVO");
             return res.status(403).json({ 
                 success: false, 
                 error: "Cuenta desactivada",
@@ -157,7 +161,6 @@ console.log("Objeto empresa completo:", JSON.stringify(empresa));
         // 7. Devolver respuesta exitosa (sin el hash de la contraseña)
         const { password: _, ...empresaData } = empresa;
 
-        // Si todo está OK, enviamos el éxito
         res.status(200).json({
             success: true,
             message: "Inicio de sesión exitoso",

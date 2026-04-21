@@ -34,7 +34,7 @@ export const crearEmpresa = async (req, res) => {
         } = req.body;
 
         // 3. Validación de campos obligatorios (Añadimos 'password')
-        // Agregamos 'modalidad' a la lista de validación
+        // Agregamos 'modalidad' a la lista de validación pruebas
 if (!companyName || !email || !phones || !contactName || !address || !city || !department || !companyType || !economicSector || !foundationYear || !annualRevenue || !employees || !distributionChannels || !mainClients || !password || !modalidad) {
     return res.status(400).json({ error: "Faltan campos obligatorios, incluyendo la modalidad y contraseña" });
 }

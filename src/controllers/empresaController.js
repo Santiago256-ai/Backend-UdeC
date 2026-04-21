@@ -127,7 +127,9 @@ export const loginEmpresa = async (req, res) => {
         if (!empresa) {
             return res.status(401).json({ error: "Credenciales incorrectas." });
         }
-
+// Temporal para depurar
+console.log("¿Qué estado lee el servidor?:", empresa.estado);
+console.log("Objeto empresa completo:", JSON.stringify(empresa));
         // 🛑 VALIDACIÓN DE ESTADO (El muro de seguridad)
         // Usamos status 403 (Prohibido) para que el frontend sepa que el acceso está denegado por el Admin
         if (empresa.estado === "INACTIVO") {

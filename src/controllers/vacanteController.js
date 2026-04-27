@@ -67,23 +67,42 @@ export const crearVacante = async (req, res) => {
 };
 
 // 🟡 2. Listar vacantes por ID de empresa
+// 🟡 2. Listar vacantes por ID de empresa (DINÁMICO PARA ELIMINADAS)
 export const listarVacantesPorEmpresa = async (req, res) => {
     try {
         const empresaId = parseInt(req.params.id); 
-        
+        const { estado } = req.query; // 👈 Capturamos el ?estado= de la URL
+
+        if (isNaN(empresaId)) {
+            return res.status(400).json({ error: "ID de empresa inválido." });
+        }
+
+        // Definimos el filtro base
+        let filtro = { empresaId: empresaId };
+
+        // LÓGICA DINÁMICA:
+        if (estado === "ELIMINADA") {
+            // Si el front pide las eliminadas, filtramos SOLO por ese estado
+            filtro.estado = "ELIMINADA";
+        } else {
+            // Si no pide nada (Panel Principal), mostramos todo lo que NO esté eliminado
+            filtro.estado = { not: "ELIMINADA" };
+        }
+
         const vacantes = await prisma.vacante.findMany({
-            where: { 
-                empresaId: empresaId,
-                estado: { not: "ELIMINADA" } // 👈 IMPORTANTE: No mostrar las eliminadas aquí
-            }, 
+            where: filtro, 
             include: {
-                _count: { select: { postulaciones: true } }
+                _count: {
+                    select: { postulaciones: true }
+                }
             },
             orderBy: { id: "desc" },
         });
+
         res.json(vacantes);
     } catch (error) {
-        res.status(500).json({ error: "Error al listar vacantes" });
+        console.error("❌ Error al listar vacantes:", error);
+        res.status(500).json({ error: "Error interno al listar las vacantes." });
     }
 };
 

@@ -139,6 +139,7 @@ model Vacante {
   mensajes          Mensaje[]
   postulaciones     Postulacion[]
   empresa           Empresa       @relation(fields: [empresaId], references: [id])
+  updatedAt DateTime @default(now()) @updatedAt
 }
 
 model Postulacion {

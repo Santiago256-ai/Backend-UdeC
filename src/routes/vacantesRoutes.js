@@ -6,27 +6,42 @@ import {
     listarVacantesPorEmpresa,
     listarTodasLasVacantesAdmin,
     obtenerEstadisticasAdmin,
-    actualizarVacante // 👈 1. AGREGA ESTA IMPORTACIÓN
+    actualizarVacante,
+    reactivarVacante,          // 🆕 Nueva importación
+    eliminarDefinitivamente    // 🆕 Nueva importación
 } from "../controllers/vacanteController.js";
 
 const router = express.Router();
 
+// --- RUTAS PÚBLICAS / GENERALES ---
+
 // 🟢 Crear vacante
 router.post("/", crearVacante); 
 
-// 🟢 Listar TODAS las vacantes
+// 🟢 Listar TODAS las vacantes (Para el feed de egresados - solo ABIERTAS)
 router.get("/", listarVacantes); 
 
-// 🔵 Actualizar vacante (Editar)
-router.put("/:id", actualizarVacante); // 👈 2. AGREGA ESTA LÍNEA EXACTAMENTE AQUÍ
 
-// ✅ Listar vacantes por ID de empresa
+// --- RUTAS DE GESTIÓN (Empresa) ---
+
+// 🔵 Actualizar vacante (Editar)
+router.put("/:id", actualizarVacante); 
+
+// ✅ Listar vacantes por ID de empresa (Soportará filtros por estado via Query Params)
 router.get("/empresa/:id", listarVacantesPorEmpresa);
 
-// 🔴 Eliminar vacante
+// ♻️ Reactivar una vacante (Mover de Eliminadas a Activas)
+router.put("/:id/reactivar", reactivarVacante);
+
+// 🔴 Mover a la papelera (Borrado Lógico - Cambia estado a "ELIMINADA")
 router.delete("/:id", eliminarVacante);
 
-// --- Rutas de Administración ---
+// 💀 Eliminar DEFINITIVAMENTE (Borrado físico de la base de datos)
+router.delete("/:id/definitivo", eliminarDefinitivamente);
+
+
+// --- RUTAS DE ADMINISTRACIÓN ---
+
 router.get("/admin/todas", listarTodasLasVacantesAdmin);
 router.get("/stats", obtenerEstadisticasAdmin);
 

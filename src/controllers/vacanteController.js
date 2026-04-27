@@ -67,30 +67,23 @@ export const crearVacante = async (req, res) => {
 };
 
 // 🟡 2. Listar vacantes por ID de empresa
-// 🟡 2. Listar vacantes por ID de empresa (CORREGIDO PARA EL CONTADOR)
 export const listarVacantesPorEmpresa = async (req, res) => {
     try {
         const empresaId = parseInt(req.params.id); 
-
-        if (isNaN(empresaId)) {
-            return res.status(400).json({ error: "ID de empresa inválido." });
-        }
-
+        
         const vacantes = await prisma.vacante.findMany({
-            where: { empresaId: empresaId }, 
+            where: { 
+                empresaId: empresaId,
+                estado: { not: "ELIMINADA" } // 👈 IMPORTANTE: No mostrar las eliminadas aquí
+            }, 
             include: {
-                // ESTO ES LO QUE TE FALTA:
-                _count: {
-                    select: { postulaciones: true }
-                }
+                _count: { select: { postulaciones: true } }
             },
             orderBy: { id: "desc" },
         });
-
         res.json(vacantes);
     } catch (error) {
-        console.error("❌ Error al listar vacantes por empresa:", error);
-        res.status(500).json({ error: "Error interno al listar las vacantes." });
+        res.status(500).json({ error: "Error al listar vacantes" });
     }
 };
 
@@ -123,41 +116,63 @@ export const listarVacantes = async (req, res) => {
 };
 
 // 🔴 4. Eliminar una vacante por ID
-// 🔴 4. Eliminar una vacante por ID (CORREGIDO PARA BORRAR EN CASCADA)
+// 🔴 4. Eliminar una vacante (Ahora es un BORRADO LÓGICO / SOFT DELETE)
 export const eliminarVacante = async (req, res) => {
     try {
         const { id } = req.params;
         const idNumerico = parseInt(id);
 
         if (isNaN(idNumerico)) {
-            return res.status(400).json({ error: "El ID de la vacante es obligatorio y debe ser numérico." });
+            return res.status(400).json({ error: "ID inválido." });
         }
 
-        const vacanteExistente = await prisma.vacante.findUnique({
+        // En lugar de borrar, ACTUALIZAMOS el estado
+        const vacanteEliminada = await prisma.vacante.update({
             where: { id: idNumerico },
+            data: { 
+                estado: "ELIMINADA" // <-- Este cambio la "mueve" de vista
+            },
         });
 
-        if (!vacanteExistente) {
-            return res.status(404).json({ error: "Vacante no encontrada." });
-        }
-
-        // 🔥 PASO CRÍTICO: Eliminar primero todas las postulaciones asociadas
-        // Esto evita el error de "Foreign key constraint" (Error 500)
-        await prisma.postulacion.deleteMany({
-            where: { vacanteId: idNumerico }
-        });
-
-        // Ahora que la vacante está "sola", podemos eliminarla
-        await prisma.vacante.delete({
-            where: { id: idNumerico },
-        });
-
-        console.log("🗑️ Vacante y sus postulaciones eliminadas:", id);
-        res.json({ message: "Vacante eliminada correctamente." });
+        console.log("♻️ Vacante movida a la papelera:", idNumerico);
+        res.json({ message: "Vacante movida a la papelera correctamente.", vacante: vacanteEliminada });
 
     } catch (error) {
-        console.error("❌ Error al eliminar vacante:", error.message);
-        res.status(500).json({ error: "Error interno al eliminar vacante.", detalle: error.message });
+        console.error("❌ Error al realizar borrado lógico:", error.message);
+        res.status(500).json({ error: "Error interno al eliminar vacante." });
+    }
+};
+
+// 🟢 NUEVO: Función para Reactivar Vacante (El botón de "Rehacer" de tu frontend)
+export const reactivarVacante = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await prisma.vacante.update({
+            where: { id: parseInt(id) },
+            data: { estado: "ABIERTA" }
+        });
+        res.json({ message: "Vacante reactivada correctamente" });
+    } catch (error) {
+        res.status(500).json({ error: "Error al reactivar" });
+    }
+};
+
+// 💀 NUEVO: Función para Borrado Definitivo (El icono rojo de la papelera)
+export const eliminarDefinitivamente = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const idNumerico = parseInt(id);
+
+        // Borramos postulaciones primero por la clave foránea
+        await prisma.postulacion.deleteMany({ where: { vacanteId: idNumerico } });
+        // Borramos mensajes asociados
+        await prisma.mensaje.deleteMany({ where: { vacanteId: idNumerico } });
+        
+        await prisma.vacante.delete({ where: { id: idNumerico } });
+        
+        res.json({ message: "Vacante borrada permanentemente" });
+    } catch (error) {
+        res.status(500).json({ error: "Error al borrar definitivamente" });
     }
 };
 

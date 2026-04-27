@@ -253,3 +253,43 @@ export const actualizarEstadoEmpresaAdmin = async (req, res) => {
         res.status(500).json({ error: "No se pudo cambiar el estado." });
     }
 };
+
+// 🟢 NUEVO: Función para que el Admin edite cualquier empresa sin restricción de ID
+export const actualizarEmpresaAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const idNumerico = parseInt(id);
+        const dataToUpdate = req.body;
+
+        // 🛡️ Limpiamos datos que no deben actualizarse directamente o metadatos
+        delete dataToUpdate.id;
+        delete dataToUpdate.createdAt;
+        delete dataToUpdate.password; 
+        delete dataToUpdate._count; // Muy importante quitar esto porque Prisma falla si intentas guardar el conteo de vacantes
+
+        // 🛠️ FORMATEO: Aseguramos tipos de datos correctos
+        if (dataToUpdate.foundationYear) {
+            dataToUpdate.foundationYear = parseInt(dataToUpdate.foundationYear);
+        }
+
+        const empresaActualizada = await prisma.empresa.update({
+            where: { id: idNumerico },
+            data: dataToUpdate
+        });
+
+        console.log(`✅ Expediente de empresa ID ${id} actualizado por ADMIN.`);
+        res.json({ 
+            message: "Expediente actualizado con éxito", 
+            empresa: empresaActualizada 
+        });
+
+    } catch (error) {
+        console.error("❌ Error en actualizarEmpresaAdmin:", error);
+        
+        if (error.code === 'P2002') {
+            return res.status(409).json({ error: "El NIT o Correo ingresado ya está registrado en otra empresa." });
+        }
+
+        res.status(500).json({ error: "No se pudo actualizar la información de la empresa." });
+    }
+};

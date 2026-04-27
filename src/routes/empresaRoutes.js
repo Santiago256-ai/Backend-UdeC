@@ -7,7 +7,8 @@ import {
     eliminarEmpresaAdmin,
     obtenerPerfilEmpresa, // 👈 Agregar
     actualizarEmpresa,    // 👈 Agregar
-    actualizarEstadoEmpresaAdmin
+    actualizarEstadoEmpresaAdmin,
+    actualizarEmpresaAdmin
 } from "../controllers/empresaController.js";
 
 const router = Router();
@@ -23,5 +24,6 @@ router.put("/:id", authMiddleware, actualizarEmpresa);
 router.get("/admin/todas", obtenerEmpresasParaAdmin);
 router.delete("/admin/:id", eliminarEmpresaAdmin);
 router.put('/admin/estado/:id', actualizarEstadoEmpresaAdmin);
+router.put('/admin/:id', actualizarEmpresaAdmin);
 
 export default router;

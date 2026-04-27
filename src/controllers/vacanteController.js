@@ -71,7 +71,7 @@ export const crearVacante = async (req, res) => {
 export const listarVacantesPorEmpresa = async (req, res) => {
     try {
         const empresaId = parseInt(req.params.id); 
-        const { estado } = req.query; // 👈 Capturamos el ?estado= de la URL
+        const { estado } = req.query; // Capturamos el ?estado= de la URL
 
         if (isNaN(empresaId)) {
             return res.status(400).json({ error: "ID de empresa inválido." });
@@ -96,7 +96,9 @@ export const listarVacantesPorEmpresa = async (req, res) => {
                     select: { postulaciones: true }
                 }
             },
-            orderBy: { id: "desc" },
+            // 🟢 MODIFICACIÓN AQUÍ:
+            // Usamos updatedAt para que la última que se eliminó aparezca primero
+            orderBy: { updatedAt: "desc" }, 
         });
 
         res.json(vacantes);

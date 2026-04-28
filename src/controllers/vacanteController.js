@@ -112,15 +112,19 @@ export const listarVacantesPorEmpresa = async (req, res) => {
 // 🟡 3. Listar todas las vacantes (Para el feed de estudiantes) - CORREGIDO
 export const listarVacantes = async (req, res) => {
     try {
-        const ahora = new Date();
+        // 🟢 AJUSTE DE FECHA:
+        // Obtenemos el momento actual, pero lo seteamos al inicio del día (00:00:00)
+        // Esto asegura que si una vacante vence HOY, todavía sea visible hasta que termine el día.
+        const hoyInicio = new Date();
+        hoyInicio.setHours(0, 0, 0, 0);
 
         const vacantes = await prisma.vacante.findMany({
             where: {
                 estado: "ABIERTA",
-                // CONDICIÓN 1: La fecha de cierre debe ser mayor a "ahora" 
-                // o ser nula (si no tiene fecha límite)
+                // CONDICIÓN 1: La fecha de cierre debe ser mayor o igual al inicio de hoy
+                // (O sea, hoy o cualquier día futuro) o ser nula.
                 OR: [
-                    { fechaCierre: { gt: ahora } },
+                    { fechaCierre: { gte: hoyInicio } },
                     { fechaCierre: null }
                 ],
             },
@@ -142,9 +146,9 @@ export const listarVacantes = async (req, res) => {
         });
 
         // CONDICIÓN 2: Filtrar programáticamente las que ya cumplieron el límite de cupos
-        // Filtramos en JS porque necesitamos comparar el conteo con el campo limitePostulantes
         const vacantesDisponibles = vacantes.filter(vacante => {
-            if (!vacante.limitePostulantes) return true; // Si no hay límite, se muestra
+            if (!vacante.limitePostulantes) return true;
+            // Solo devolvemos las que tengan menos postulados que el límite
             return vacante._count.postulaciones < vacante.limitePostulantes;
         });
 

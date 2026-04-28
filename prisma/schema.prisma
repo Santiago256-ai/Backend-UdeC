@@ -52,17 +52,23 @@ model Educacion {
   titulo      String
   institucion String
   periodo     String
+  fechaInicio String?  // NUEVO
+  fechaFin    String?  // NUEVO
+  actualmente Boolean? @default(false) // NUEVO
   perfilId    Int
   perfil      PerfilCV @relation(fields: [perfilId], references: [id], onDelete: Cascade)
 }
 
 model Experiencia {
-  id       Int      @id @default(autoincrement())
-  cargo    String
-  empresa  String
-  periodo  String
-  perfilId Int
-  perfil   PerfilCV @relation(fields: [perfilId], references: [id], onDelete: Cascade)
+  id          Int      @id @default(autoincrement())
+  cargo       String
+  empresa     String
+  periodo     String
+  fechaInicio String?  // NUEVO
+  fechaFin    String?  // NUEVO
+  actualmente Boolean? @default(false) // NUEVO
+  perfilId    Int
+  perfil      PerfilCV @relation(fields: [perfilId], references: [id], onDelete: Cascade)
 }
 
 model Aptitud {

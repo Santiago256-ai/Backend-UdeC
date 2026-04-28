@@ -13,20 +13,26 @@ export const upsertCV = async (req, res) => {
         // --- LIMPIEZA Y MAPEADO SEGÚN SCHEMA.PRISMA ---
         
         const expLimpia = (data.experiencia || [])
-            .filter(e => e.cargo && e.cargo.trim() !== "")
-            .map(e => ({ 
-                cargo: e.cargo, 
-                empresa: e.empresa || "", 
-                periodo: e.periodo || "" 
-            }));
+    .filter(e => e.cargo && e.cargo.trim() !== "")
+    .map(e => ({ 
+        cargo: e.cargo, 
+        empresa: e.empresa || "", 
+        periodo: e.periodo || "",
+        fechaInicio: e.fechaInicio || null,      // ATRAMAPOS FECHA INICIO
+        fechaFin: e.fechaFin || null,            // ATRAMAPOS FECHA FIN
+        actualmente: Boolean(e.actualmente)      // ATRAPAMOS EL CHECKBOX
+    }));
 
-        const eduLimpia = (data.educacion || [])
-            .filter(e => e.titulo && e.titulo.trim() !== "")
-            .map(e => ({ 
-                titulo: e.titulo, 
-                institucion: e.institucion || "", 
-                periodo: e.periodo || "" 
-            }));
+const eduLimpia = (data.educacion || [])
+    .filter(e => e.titulo && e.titulo.trim() !== "")
+    .map(e => ({ 
+        titulo: e.titulo, 
+        institucion: e.institucion || "", 
+        periodo: e.periodo || "",
+        fechaInicio: e.fechaInicio || null,      // ATRAMAPOS FECHA INICIO
+        fechaFin: e.fechaFin || null,            // ATRAMAPOS FECHA FIN
+        actualmente: Boolean(e.actualmente)      // ATRAPAMOS EL CHECKBOX
+    }));
 
         // CORRECCIÓN AQUÍ: El modelo Referencia usa 'celular' no 'celular'
         const refLimpia = (data.referencias || [])

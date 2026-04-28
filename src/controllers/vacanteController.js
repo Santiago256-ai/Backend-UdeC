@@ -109,18 +109,29 @@ export const listarVacantesPorEmpresa = async (req, res) => {
 };
 
 // 🟡 3. Listar todas las vacantes (Para el feed de estudiantes)
+// 🟡 3. Listar todas las vacantes (Para el feed de estudiantes) - CORREGIDO
 export const listarVacantes = async (req, res) => {
     try {
+        const ahora = new Date();
+
         const vacantes = await prisma.vacante.findMany({
-            where: { estado: "ABIERTA" },
+            where: {
+                estado: "ABIERTA",
+                // CONDICIÓN 1: La fecha de cierre debe ser mayor a "ahora" 
+                // o ser nula (si no tiene fecha límite)
+                OR: [
+                    { fechaCierre: { gt: ahora } },
+                    { fechaCierre: null }
+                ],
+            },
             include: {
                 empresa: true,
                 postulaciones: {
                     select: {
-                        id: true,       // <--- ¡FALTABA ESTA LÍNEA! Es el ID de la postulación
+                        id: true,
                         egresadoId: true,
-                        estado: true, 
-                        fecha: true   
+                        estado: true,
+                        fecha: true
                     }
                 },
                 _count: {
@@ -129,9 +140,17 @@ export const listarVacantes = async (req, res) => {
             },
             orderBy: { id: "desc" },
         });
-        res.json(vacantes);
+
+        // CONDICIÓN 2: Filtrar programáticamente las que ya cumplieron el límite de cupos
+        // Filtramos en JS porque necesitamos comparar el conteo con el campo limitePostulantes
+        const vacantesDisponibles = vacantes.filter(vacante => {
+            if (!vacante.limitePostulantes) return true; // Si no hay límite, se muestra
+            return vacante._count.postulaciones < vacante.limitePostulantes;
+        });
+
+        res.json(vacantesDisponibles);
     } catch (error) {
-        console.error("❌ Error detallado de Prisma:", error.message);
+        console.error("❌ Error al listar vacantes filtradas:", error.message);
         res.status(500).json({ error: "Error interno al listar vacantes." });
     }
 };

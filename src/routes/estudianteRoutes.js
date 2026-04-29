@@ -49,6 +49,7 @@ router.get("/usuario/:usuarioId", authMiddleware, async (req, res) => {
 });
 
 // 2. Postularse a una vacante
+// 2. Postularse a una vacante (VERSIÓN ACTUALIZADA CON NOTIFICACIONES)
 router.post("/:vacanteId/postular", authMiddleware, async (req, res) => {
     try {
         const { telefono } = req.body;
@@ -59,10 +60,30 @@ router.post("/:vacanteId/postular", authMiddleware, async (req, res) => {
             return res.status(400).json({ error: "ID de vacante o usuario inválido" });
         }
 
+        // 1. Verificar vacante y obtener el empresaId para saber a quién notificar
+        const vacante = await prisma.vacante.findUnique({
+            where: { id: vId },
+            select: { titulo: true, estado: true, empresaId: true }
+        });
+
+        if (!vacante) return res.status(404).json({ error: "La vacante no existe." });
+        if (vacante.estado === "CERRADA") return res.status(400).json({ error: "Esta vacante ya no acepta postulaciones." });
+
+        // 2. Verificar si ya está postulado para evitar duplicados
+        const yaPostulado = await prisma.postulacion.findUnique({
+            where: { vacanteId_egresadoId: { vacanteId: vId, egresadoId: uId } }
+        });
+
+        if (yaPostulado) {
+            return res.status(400).json({ error: "Ya te has postulado a esta vacante anteriormente." });
+        }
+
+        // 3. Obtener el perfil para el celular de respaldo
         const perfil = await prisma.perfilCV.findUnique({
             where: { egresadoId: uId } 
         });
 
+        // 4. Crear Postulación
         const postulacion = await prisma.postulacion.create({
             data: {
                 vacanteId: vId,
@@ -70,8 +91,26 @@ router.post("/:vacanteId/postular", authMiddleware, async (req, res) => {
                 telefono: telefono || perfil?.celular || "Sin teléfono", 
                 estado: "PENDIENTE"
             },
+            include: { 
+                egresado: { select: { nombres: true } } // Necesitamos el nombre para la notificación
+            }
         });
 
+        // 🔔 5. CREAR NOTIFICACIÓN PARA LA EMPRESA
+        await prisma.notificacion.create({
+            data: {
+                tipo: 'POSTULACION',
+                contenido: `${postulacion.egresado.nombres} se ha postulado a tu vacante: "${vacante.titulo}"`,
+                empresaId: vacante.empresaId, // 👈 Destino: la empresa dueña
+                egresadoId: uId,             // 👈 Origen: el egresado
+                referenciaId: vId,           // ID de la vacante
+                postulacionId: postulacion.id,
+                vista: false,
+                fecha: new Date()
+            }
+        });
+
+        // 6. Respondemos exactamente lo que el frontend espera
         res.json({ message: "¡Postulación exitosa!", postulacion });
     } catch (error) {
         console.error("ERROR EN POSTULACIÓN:", error.message);

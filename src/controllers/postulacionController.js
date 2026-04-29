@@ -130,8 +130,6 @@ export const obtenerPostulacionesPorVacante = async (req, res) => {
 }
 
 // 🟢 ACTUALIZAR ESTADO DE POSTULACIÓN
-// 🟢 ACTUALIZAR ESTADO DE POSTULACIÓN (Versión Pipeline Profesional)
-// 🟢 ACTUALIZAR ESTADO DE POSTULACIÓN
 export const actualizarEstadoPostulacion = async (req, res) => {
     try {
         const postulacionId = parseInt(req.params.id);
@@ -155,25 +153,25 @@ export const actualizarEstadoPostulacion = async (req, res) => {
             data: { estado: estado.toUpperCase() },
             include: { 
                 egresado: true,
-                vacante: { select: { titulo: true } } 
+                vacante: { select: { titulo: true, id: true } } 
             } 
         });
 
-        // 2. 🔔 CREAR LA NOTIFICACIÓN PARA EL EGRESADO
-        // Usamos los datos que ya vienen en el 'include' de la actualización
+        // 2. 🔔 NOTIFICACIÓN PARA EL EGRESADO
         await prisma.notificacion.create({
             data: {
                 tipo: 'POSTULACION',
                 contenido: `Tu postulación a la vacante "${postulacionActualizada.vacante.titulo}" ha cambiado a: ${estado.toUpperCase()}`,
-                egresadoId: postulacionActualizada.egresadoId,
-                referenciaId: postulacionActualizada.vacanteId, 
-                postulacionId: postulacionId,
+                egresadoId: postulacionActualizada.egresadoId, // Destinatario: Egresado
+                empresaId: null, // 👈 IMPORTANTE: Aseguramos que sea null para que no le salga a la empresa
+                referenciaId: postulacionActualizada.vacante.id, 
+                postulacionId: postulacionId, // 👈 Esto permite el resaltado naranja que programamos
                 vista: false,
                 fecha: new Date()
             }
         });
 
-        console.log(`✅ Notificación enviada a ${postulacionActualizada.egresado.correo}`);
+        console.log(`✅ Notificación de estado enviada al egresado: ${postulacionActualizada.egresado.correo}`);
         res.json(postulacionActualizada);
 
     } catch (error) {

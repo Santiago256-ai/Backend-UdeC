@@ -8,86 +8,66 @@ const supabase = createClient(
 );
 
 // 🟢 Crear una nueva postulación (CON VALIDACIONES DE LÍMITES)
-// postulacionController.js (Versión Limpia 100% Neon)
 export const crearPostulacion = async (req, res) => {
   try {
     const { telefono, vacanteId, egresadoId } = req.body;
-    
-    // Aseguramos que los IDs sean números
     const uId = parseInt(egresadoId || req.user?.id); 
     const vId = parseInt(vacanteId);
 
-    // 1. Validaciones iniciales de IDs
     if (isNaN(uId) || isNaN(vId)) {
       return res.status(400).json({ error: "ID de egresado o vacante no válido." });
     }
 
-    // 2. Verificar si la vacante existe y su estado
+    // 1. Buscamos la vacante para obtener el empresaId
     const vacante = await prisma.vacante.findUnique({
-        where: { id: vId }
+        where: { id: vId },
+        select: { titulo: true, estado: true, empresaId: true } // Traemos empresaId
     });
 
     if (!vacante) return res.status(404).json({ error: "La vacante no existe." });
-    if (vacante.estado === "CERRADA") return res.status(400).json({ error: "Esta vacante ya no acepta más postulaciones." });
+    if (vacante.estado === "CERRADA") return res.status(400).json({ error: "Esta vacante ya no acepta postulaciones." });
 
-    // 3. Evitar duplicados usando la clave única compuesta definida en el schema
+    // 2. Verificar duplicados
     const yaPostulado = await prisma.postulacion.findUnique({
-        where: {
-            vacanteId_egresadoId: {
-                vacanteId: vId,
-                egresadoId: uId
-            }
-        }
+        where: { vacanteId_egresadoId: { vacanteId: vId, egresadoId: uId } }
     });
 
     if (yaPostulado) {
         return res.status(400).json({ error: "Ya te has postulado a esta vacante anteriormente." });
     }
 
-    // 4. Guardar la postulación en la base de datos
-    // Incluimos 'egresado' y 'vacante' en el resultado para tener los nombres para la notificación
+    // 3. Guardar la postulación
     const postulacion = await prisma.postulacion.create({
       data: {
         telefono: String(telefono || ""),
         vacanteId: vId,
         egresadoId: uId,
         estado: "PENDIENTE", 
-        anclado: false,
       },
       include: { 
-        egresado: {
-            select: { nombres: true, apellidos: true }
-        },
-        vacante: {
-            select: { titulo: true, empresaId: true }
-        }
+        egresado: { select: { nombres: true } }
       }
     });
 
-    // 🔔 5. CREAR NOTIFICACIÓN PARA LA EMPRESA
-    // Esta es la parte que alimenta la sección de notificaciones de la empresa
+    // 🔔 4. CREAR NOTIFICACIÓN PARA LA EMPRESA (Aquí estaba el error)
     await prisma.notificacion.create({
       data: {
         tipo: 'POSTULACION',
-        contenido: `${postulacion.egresado.nombres} se ha postulado a tu vacante: "${postulacion.vacante.titulo}"`,
-        empresaId: postulacion.vacante.empresaId, // Destinatario (Empresa)
-        egresadoId: uId,                         // Quien origina la acción
-        referenciaId: vId,                       // ID de la vacante para redireccionar al clic
-        postulacionId: postulacion.id,           // Relación directa con la postulación
+        contenido: `${postulacion.egresado.nombres} se ha postulado a tu vacante: "${vacante.titulo}"`,
+        empresaId: vacante.empresaId, // 👈 ESTO ES LO QUE LE FALTABA: Asignar el dueño de la notificación
+        egresadoId: uId,             
+        referenciaId: vId,           
+        postulacionId: postulacion.id,
         vista: false,
         fecha: new Date()
       }
     });
     
-    // 6. Respuesta exitosa al frontend
     res.status(201).json(postulacion);
 
   } catch (error) {
     console.error("❌ Error en crearPostulacion:", error);
-    res.status(500).json({ 
-        error: "No se pudo procesar la postulación.",
-        detalle: error.message 
-    });
+    res.status(500).json({ error: "No se pudo procesar la postulación." });
   }
 };
 

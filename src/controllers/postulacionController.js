@@ -7,8 +7,69 @@ const supabase = createClient(
     process.env.SUPABASE_ANON_KEY
 );
 
-// ❌ NOTA: La función crearPostulacion se movió a las rutas del estudiante
-// para integrarse correctamente con el frontend y las notificaciones.
+// 🟢 Crear una nueva postulación (CON VALIDACIONES DE LÍMITES)
+export const crearPostulacion = async (req, res) => {
+  try {
+    const { telefono, vacanteId, egresadoId } = req.body;
+    const uId = parseInt(egresadoId || req.user?.id); 
+    const vId = parseInt(vacanteId);
+
+    if (isNaN(uId) || isNaN(vId)) {
+      return res.status(400).json({ error: "ID de egresado o vacante no válido." });
+    }
+
+    // 1. Buscamos la vacante para obtener el empresaId
+    const vacante = await prisma.vacante.findUnique({
+        where: { id: vId },
+        select: { titulo: true, estado: true, empresaId: true } // Traemos empresaId
+    });
+
+    if (!vacante) return res.status(404).json({ error: "La vacante no existe." });
+    if (vacante.estado === "CERRADA") return res.status(400).json({ error: "Esta vacante ya no acepta postulaciones." });
+
+    // 2. Verificar duplicados
+    const yaPostulado = await prisma.postulacion.findUnique({
+        where: { vacanteId_egresadoId: { vacanteId: vId, egresadoId: uId } }
+    });
+
+    if (yaPostulado) {
+        return res.status(400).json({ error: "Ya te has postulado a esta vacante anteriormente." });
+    }
+
+    // 3. Guardar la postulación
+    const postulacion = await prisma.postulacion.create({
+      data: {
+        telefono: String(telefono || ""),
+        vacanteId: vId,
+        egresadoId: uId,
+        estado: "PENDIENTE", 
+      },
+      include: { 
+        egresado: { select: { nombres: true } }
+      }
+    });
+
+    // 🔔 4. CREAR NOTIFICACIÓN PARA LA EMPRESA (Aquí estaba el error)
+    await prisma.notificacion.create({
+      data: {
+        tipo: 'POSTULACION',
+        contenido: `${postulacion.egresado.nombres} se ha postulado a tu vacante: "${vacante.titulo}"`,
+        empresaId: vacante.empresaId, // 👈 ESTO ES LO QUE LE FALTABA: Asignar el dueño de la notificación
+        egresadoId: uId,             
+        referenciaId: vId,           
+        postulacionId: postulacion.id,
+        vista: false,
+        fecha: new Date()
+      }
+    });
+    
+    res.status(201).json(postulacion);
+
+  } catch (error) {
+    console.error("❌ Error en crearPostulacion:", error);
+    res.status(500).json({ error: "No se pudo procesar la postulación." });
+  }
+};
 
 // ✅ OBTENER POSTULACIONES POR ID DE VACANTE (CORREGIDO SEGÚN SCHEMA.PRISMA)
 export const obtenerPostulacionesPorVacante = async (req, res) => {
@@ -23,6 +84,7 @@ export const obtenerPostulacionesPorVacante = async (req, res) => {
                     include: {
                         cv: {
                             include: {
+                                // Nombres exactos de las relaciones en tu PerfilCV (schema.prisma)
                                 educacion: true,   
                                 experiencia: true, 
                                 aptitudes: true,
@@ -38,6 +100,7 @@ export const obtenerPostulacionesPorVacante = async (req, res) => {
     
         res.json(postulaciones);
     } catch (error) {
+        // Imprime el error específico para depurar en Vercel
         console.error("❌ Error de Prisma al obtener perfil completo:", error.message);
         res.status(500).json({ 
             error: "No se pudo obtener la información completa del perfil.",
@@ -82,7 +145,7 @@ export const actualizarEstadoPostulacion = async (req, res) => {
                 egresadoId: postulacionActualizada.egresadoId, // Destinatario: Egresado
                 empresaId: null, // 👈 IMPORTANTE: Aseguramos que sea null para que no le salga a la empresa
                 referenciaId: postulacionActualizada.vacante.id, 
-                postulacionId: postulacionId, 
+                postulacionId: postulacionId, // 👈 Esto permite el resaltado naranja que programamos
                 vista: false,
                 fecha: new Date()
             }
@@ -96,6 +159,8 @@ export const actualizarEstadoPostulacion = async (req, res) => {
         res.status(500).json({ error: "Error al actualizar la postulación." });
     }
 };
+
+// postulacionController.js
 
 export const obtenerDetallePostulacionesAdmin = async (req, res) => {
     try {
@@ -154,6 +219,8 @@ export const obtenerTodasLasPostulacionesAdmin = async (req, res) => {
     }
 };
 
+// En controllers/postulacionController.js
+
 export const actualizarAnclajePostulacion = async (req, res) => {
     const { id } = req.params;
     const { anclado } = req.body;
@@ -201,7 +268,7 @@ export const obtenerPostulacionesPorEmpresa = async (req, res) => {
                 }
             },
             orderBy: {
-                fecha: 'desc' 
+                fecha: 'desc' // Mostrar las más recientes primero
             }
         });
 

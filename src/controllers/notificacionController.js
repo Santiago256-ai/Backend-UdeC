@@ -5,10 +5,11 @@ export const obtenerNotificacionesEgresado = async (req, res) => {
         const { egresadoId } = req.params;
         const notificaciones = await prisma.notificacion.findMany({
             where: {
-                egresadoId: parseInt(egresadoId)
+                egresadoId: parseInt(egresadoId),
+                empresaId: null // 👈 AQUÍ ESTÁ LA MAGIA: Excluimos las que son para la empresa
             },
             orderBy: {
-                fecha: 'desc' // Las más recientes primero
+                fecha: 'desc' 
             }
         });
         res.json(notificaciones);

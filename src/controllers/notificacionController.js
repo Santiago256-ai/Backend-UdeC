@@ -48,3 +48,40 @@ export const eliminarNotificacion = async (req, res) => {
         res.status(500).json({ error: "No se pudo eliminar la notificación." });
     }
 };
+
+// Obtener notificaciones para una empresa específica
+// Obtener notificaciones para una empresa específica
+export const obtenerNotificacionesEmpresa = async (req, res) => {
+    try {
+        const { empresaId } = req.params;
+
+        const notificaciones = await prisma.notificacion.findMany({
+            where: {
+                empresaId: parseInt(empresaId) // Filtro directo ahora que existe en el Schema
+            },
+            include: {
+                egresado: {
+                    select: {
+                        nombres: true,
+                        apellidos: true
+                    }
+                },
+                postulacion: {
+                    include: {
+                        vacante: {
+                            select: { titulo: true }
+                        }
+                    }
+                }
+            },
+            orderBy: {
+                fecha: 'desc'
+            }
+        });
+
+        res.json(notificaciones);
+    } catch (error) {
+        console.error("❌ Error al obtener notificaciones empresa:", error.message);
+        res.status(500).json({ error: "Error interno del servidor" });
+    }
+};

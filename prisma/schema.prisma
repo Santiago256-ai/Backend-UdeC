@@ -122,6 +122,7 @@ model Empresa {
   createdAt            DateTime  @default(now())
   mensajesEnviados     Mensaje[] @relation("EmpresaSentMessages")
   vacantes             Vacante[]
+  notificaciones       Notificacion[]
   estado          String     @default("ACTIVO")
   updatedAt       DateTime   @default(now()) @updatedAt
 }
@@ -199,7 +200,7 @@ model Mensaje {
 
 model Notificacion {
   id           Int          @id @default(autoincrement())
-  tipo         String
+  tipo         String       // 'POSTULACION' o 'MENSAJE'
   contenido    String
   fecha        DateTime     @default(now())
   vista        Boolean      @default(false)
@@ -208,11 +209,16 @@ model Notificacion {
   mensajeId    Int?         @unique
   mensaje      Mensaje?     @relation(fields: [mensajeId], references: [id])
   
-  // --- AGREGA ESTO ---
   postulacionId Int?        
   postulacion   Postulacion? @relation(fields: [postulacionId], references: [id])
-  // -------------------
 
-  egresadoId   Int
-  egresado     Egresado     @relation(fields: [egresadoId], references: [id], onDelete: Cascade)
+  // --- CAMBIOS PARA SOPORTAR EMPRESAS ---
+  
+  // Hacemos el egresadoId opcional (?)
+  egresadoId   Int?        
+  egresado     Egresado?    @relation(fields: [egresadoId], references: [id], onDelete: Cascade)
+
+  // Añadimos el empresaId opcional (?)
+  empresaId    Int?
+  empresa      Empresa?     @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 }

@@ -1,6 +1,7 @@
 import express from 'express';
 import { 
     obtenerNotificacionesEgresado, 
+    obtenerNotificacionesEmpresa,
     marcarNotificacionLeida,
     eliminarNotificacion // <--- Asegúrate de importarla
 } from '../controllers/notificacionController.js';
@@ -8,6 +9,7 @@ import {
 const router = express.Router();
 
 router.get('/egresado/:egresadoId', obtenerNotificacionesEgresado);
+router.get("/empresa/:empresaId", obtenerNotificacionesEmpresa);
 router.put('/:id/leer', marcarNotificacionLeida);
 
 // --- ESTA ES LA RUTA QUE TE FALTA ---

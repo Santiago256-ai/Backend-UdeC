@@ -3,6 +3,7 @@ import {
     obtenerNotificacionesEgresado, 
     obtenerNotificacionesEmpresa,
     marcarNotificacionLeida,
+    debugNotificaciones,
     eliminarNotificacion // <--- Asegúrate de importarla
 } from '../controllers/notificacionController.js';
 

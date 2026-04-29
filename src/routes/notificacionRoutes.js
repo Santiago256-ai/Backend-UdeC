@@ -14,5 +14,7 @@ router.put('/:id/leer', marcarNotificacionLeida);
 
 // --- ESTA ES LA RUTA QUE TE FALTA ---
 router.delete('/:id', eliminarNotificacion); 
+// Importa debugNotificaciones arriba, y luego añade:
+router.get("/debug/todas", debugNotificaciones);
 
 export default router;

@@ -85,3 +85,14 @@ export const obtenerNotificacionesEmpresa = async (req, res) => {
         res.status(500).json({ error: "Error interno del servidor" });
     }
 };
+
+export const debugNotificaciones = async (req, res) => {
+    try {
+        const todas = await prisma.notificacion.findMany({
+            orderBy: { id: 'desc' }
+        });
+        res.json(todas);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};

@@ -8,6 +8,10 @@ const prisma = new PrismaClient();
  * 1. ENVIAR MENSAJE
  * Sincronizado con los modelos Egresado y Empresa.
  */
+/**
+ * 1. ENVIAR MENSAJE
+ * Sincronizado con los modelos Egresado y Empresa.
+ */
 router.post('/enviar', async (req, res) => {
     const { contenido, senderType, senderEmpresaId, senderEgresadoId, receiverId, vacanteId } = req.body;
 
@@ -16,10 +20,10 @@ router.post('/enviar', async (req, res) => {
     }
 
     try {
-        // 1. Buscamos el nombre de la vacante
+        // 1. Buscamos el nombre de la vacante Y su empresaId dueña
         const vacanteInfo = await prisma.vacante.findUnique({
             where: { id: parseInt(vacanteId) },
-            select: { titulo: true }
+            select: { titulo: true, empresaId: true } // 👈 Añadimos empresaId aquí
         });
 
         // 2. CREAMOS EL MENSAJE PRIMERO
@@ -34,15 +38,31 @@ router.post('/enviar', async (req, res) => {
             }
         });
 
-        // 3. SI ENVÍA LA EMPRESA, CREAMOS LA NOTIFICACIÓN VINCULADA
+        // 3. CREAMOS LA NOTIFICACIÓN DEPENDIENDO DE QUIÉN ENVÍA
         if (senderType === 'EMPRESA') {
+            // Si envía la empresa, notificamos al egresado
             await prisma.notificacion.create({
                 data: {
                     tipo: 'MENSAJE',
-                    contenido: `Nuevo mensaje sobre la vacante: ${vacanteInfo?.titulo || 'Oferta laboral'}`,
+                    contenido: `Nuevo mensaje sobre la vacante: "${vacanteInfo?.titulo || 'Oferta laboral'}"`,
                     egresadoId: parseInt(receiverId),
-                    referenciaId: parseInt(vacanteId), // ID de la vacante para abrir el chat
-                    mensajeId: nuevoMensaje.id      // <--- CLAVE: El ID exacto para el sombreado
+                    empresaId: null, // No es para la empresa
+                    referenciaId: parseInt(vacanteId),
+                    mensajeId: nuevoMensaje.id,
+                    vista: false
+                }
+            });
+        } else if (senderType === 'USUARIO') {
+            // Si envía el egresado, notificamos a la empresa dueña de la vacante
+            await prisma.notificacion.create({
+                data: {
+                    tipo: 'MENSAJE',
+                    contenido: `Tienes un nuevo mensaje de un candidato en la vacante: "${vacanteInfo?.titulo || 'Oferta laboral'}"`,
+                    empresaId: vacanteInfo.empresaId, // 👈 Se lo mandamos a la empresa
+                    egresadoId: parseInt(senderEgresadoId), // Para saber quién lo envió
+                    referenciaId: parseInt(vacanteId), // ID de vacante para abrir el chat
+                    mensajeId: nuevoMensaje.id,
+                    vista: false
                 }
             });
         }

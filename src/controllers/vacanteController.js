@@ -296,24 +296,29 @@ export const obtenerEstadisticasAdmin = async (req, res) => {
         const seisMesesAtras = new Date();
         seisMesesAtras.setMonth(seisMesesAtras.getMonth() - 6);
 
-        // 2. Ejecución de todas las consultas en paralelo para máxima velocidad
-        // IMPORTANTE: El orden de las variables debe ser idéntico al orden de las promesas
+        // 2. Ejecución de consultas en paralelo
         const [
-            totalVacantes, 
-            vacantesAbiertas, 
-            totalEgresados, 
-            totalEmpresas, 
+            todasLasVacantesMetadata, // Traemos data para clasificar activas vs finalizadas
+            totalEgresados,
+            totalEmpresas,
             postulacionesHoy,
             empresasRecientes,
-            todasLasVacantesConEmpresa,
             postulacionesPorEstado,
-            egresadosHistoricos,  
-            empresasHistoricas,
-            vacantesPorModalidad, 
+            vacantesPorModalidad,
             egresadosPorFacultad
         ] = await Promise.all([
-            prisma.vacante.count(),
-            prisma.vacante.count({ where: { estado: "ABIERTA" } }),
+            // Obtenemos todas las vacantes que no han sido borradas para procesar su estado real
+            prisma.vacante.findMany({
+                where: { estado: { not: "ELIMINADA" } },
+                include: {
+                    _count: {
+                        select: { postulaciones: true }
+                    },
+                    empresa: {
+                        select: { economicSector: true }
+                    }
+                }
+            }),
             prisma.egresado.count(),
             prisma.empresa.count(),
             prisma.postulacion.count({ 
@@ -326,17 +331,9 @@ export const obtenerEstadisticasAdmin = async (req, res) => {
                 orderBy: { id: 'desc' },
                 select: { id: true, nombre: true, nit: true }
             }),
-            prisma.vacante.findMany({
-                select: { empresa: { select: { economicSector: true } } }
-            }),
             prisma.postulacion.groupBy({
                 by: ['estado'],
                 _count: { _all: true }
-            }),
-            prisma.egresado.findMany({ select: { id: true } }),
-            prisma.empresa.findMany({
-                where: { createdAt: { gte: seisMesesAtras } },
-                select: { createdAt: true }
             }),
             prisma.vacante.groupBy({
                 by: ['modalidad'],
@@ -348,13 +345,28 @@ export const obtenerEstadisticasAdmin = async (req, res) => {
             })
         ]);
 
-        // 3. Procesar sectores para la Matriz
+        // 3. CLASIFICACIÓN INTELIGENTE DE VACANTES
+        let vacantesActivas = 0;
+        let vacantesFinalizadas = 0;
         const conteoSectores = {};
-        todasLasVacantesConEmpresa.forEach(v => {
+
+        todasLasVacantesMetadata.forEach(v => {
+            // Lógica de disponibilidad igual a la del feed de egresados
+            const fechaVencida = v.fechaCierre && new Date(v.fechaCierre) < inicioHoyCol;
+            const cuposLlenos = v.limitePostulantes && v._count.postulaciones >= v.limitePostulantes;
+
+            if (v.estado === "ABIERTA" && !fechaVencida && !cuposLlenos) {
+                vacantesActivas++;
+            } else {
+                vacantesFinalizadas++;
+            }
+
+            // Aprovechamos el ciclo para contar sectores económicos
             const sector = v.empresa?.economicSector?.[0] || 'Otros';
             conteoSectores[sector] = (conteoSectores[sector] || 0) + 1;
         });
 
+        // Formatear sectores para la gráfica
         const vacantesPorSector = Object.keys(conteoSectores).map(sector => ({
             economicSector: sector,
             _count: { _all: conteoSectores[sector] }
@@ -380,10 +392,10 @@ export const obtenerEstadisticasAdmin = async (req, res) => {
             };
         });
 
-        // 5. Respuesta final combinada (Enviando todos los datos al Frontend)
+        // 5. Respuesta final con la nueva diferenciación de vacantes
         res.json({
-            totalVacantes,
-            vacantesAbiertas,
+            vacantesActivas,      // Reemplaza al viejo vacantesAbiertas
+            vacantesFinalizadas,   // Nuevo KPI para procesos cerrados/llenos
             totalEgresados,
             totalEmpresas,
             postulacionesHoy,

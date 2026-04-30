@@ -297,6 +297,7 @@ export const obtenerEstadisticasAdmin = async (req, res) => {
         seisMesesAtras.setMonth(seisMesesAtras.getMonth() - 6);
 
         // 2. Ejecución de todas las consultas en paralelo para máxima velocidad
+        // IMPORTANTE: El orden de las variables debe ser idéntico al orden de las promesas
         const [
             totalVacantes, 
             vacantesAbiertas, 
@@ -305,15 +306,21 @@ export const obtenerEstadisticasAdmin = async (req, res) => {
             postulacionesHoy,
             empresasRecientes,
             todasLasVacantesConEmpresa,
-            postulacionesPorEstado, // 🟢 Datos para el Donut Chart
-            egresadosHistoricos,     // 🟢 Datos para el Line Chart
-            empresasHistoricas      // 🟢 Datos para el Line Chart
+            postulacionesPorEstado,
+            egresadosHistoricos,  
+            empresasHistoricas,
+            vacantesPorModalidad, 
+            egresadosPorFacultad
         ] = await Promise.all([
             prisma.vacante.count(),
             prisma.vacante.count({ where: { estado: "ABIERTA" } }),
             prisma.egresado.count(),
             prisma.empresa.count(),
-            prisma.postulacion.count({ where: { fecha: { gte: inicioHoyCol } } }),
+            prisma.postulacion.count({ 
+                where: { 
+                    fecha: { gte: inicioHoyCol } 
+                } 
+            }),
             prisma.empresa.findMany({
                 take: 3,
                 orderBy: { id: 'desc' },
@@ -322,18 +329,22 @@ export const obtenerEstadisticasAdmin = async (req, res) => {
             prisma.vacante.findMany({
                 select: { empresa: { select: { economicSector: true } } }
             }),
-            // Agrupar postulaciones para el gráfico de torta
             prisma.postulacion.groupBy({
                 by: ['estado'],
                 _count: { _all: true }
             }),
-            // Crecimiento de egresados (últimos 6 meses)
-            prisma.egresado.findMany({
-    select: { id: true } 
-}),
+            prisma.egresado.findMany({ select: { id: true } }),
             prisma.empresa.findMany({
                 where: { createdAt: { gte: seisMesesAtras } },
                 select: { createdAt: true }
+            }),
+            prisma.vacante.groupBy({
+                by: ['modalidad'],
+                _count: { _all: true }
+            }),
+            prisma.egresado.groupBy({
+                by: ['facultad'],
+                _count: { _all: true }
             })
         ]);
 
@@ -350,33 +361,26 @@ export const obtenerEstadisticasAdmin = async (req, res) => {
         }));
 
         // 4. Procesar datos históricos para el Line Chart (Crecimiento)
-        // Nota: Si tu modelo Usuario no tiene createdAt, este ejemplo usa el de Empresa
-        // para simular la estructura que espera la gráfica.
-        // 🟢 Cambia esta parte en tu controlador:
+        const mesesLabels = [];
+        const ahora_aux = new Date();
 
-const mesesLabels = [];
-const ahora_aux = new Date();
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date();
+            d.setMonth(ahora_aux.getMonth() - i);
+            const nombreMes = d.toLocaleString('es-ES', { month: 'short' });
+            mesesLabels.push(nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1));
+        }
 
-// Generamos los últimos 6 meses dinámicamente
-for (let i = 5; i >= 0; i--) {
-    const d = new Date();
-    d.setMonth(ahora_aux.getMonth() - i);
-    const nombreMes = d.toLocaleString('es-ES', { month: 'short' });
-    mesesLabels.push(nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1));
-}
+        const datosCrecimiento = mesesLabels.map((mes, index) => {
+            const esMesActual = index === mesesLabels.length - 1;
+            return {
+                mes: mes,
+                egresados: esMesActual ? totalEgresados : 0, 
+                empresas: esMesActual ? totalEmpresas : 0
+            };
+        });
 
-// Ahora los datos se asignarán al mes correcto (el último mes será el actual)
-const datosCrecimiento = mesesLabels.map((mes, index) => {
-    // Si es el último mes del array (el mes actual), ponemos el total real
-    const esMesActual = index === mesesLabels.length - 1;
-    return {
-        mes: mes,
-        egresados: esMesActual ? totalEgresados : 0, // Solo muestra el dato en el mes presente
-        empresas: esMesActual ? totalEmpresas : 0
-    };
-});
-
-        // 5. Respuesta final combinada
+        // 5. Respuesta final combinada (Enviando todos los datos al Frontend)
         res.json({
             totalVacantes,
             vacantesAbiertas,
@@ -386,11 +390,16 @@ const datosCrecimiento = mesesLabels.map((mes, index) => {
             empresasRecientes,
             vacantesPorSector,
             postulacionesPorEstado,
-            datosCrecimiento
+            datosCrecimiento,
+            vacantesPorModalidad,
+            egresadosPorFacultad
         });
 
     } catch (error) {
         console.error("❌ Error en estadísticas completas:", error.message);
-        res.status(500).json({ error: "Error al obtener estadísticas", detalle: error.message });
+        res.status(500).json({ 
+            error: "Error al obtener estadísticas", 
+            detalle: error.message 
+        });
     }
 };

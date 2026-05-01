@@ -221,6 +221,7 @@ export const eliminarDefinitivamente = async (req, res) => {
 };
 
 // 🔵 5. Actualizar una vacante existente
+// 🔵 5. Actualizar una vacante existente
 export const actualizarVacante = async (req, res) => {
     try {
         const { id } = req.params;
@@ -230,10 +231,12 @@ export const actualizarVacante = async (req, res) => {
             return res.status(400).json({ error: "ID de vacante inválido." });
         }
 
+        // 🆕 Agregamos 'activa' a la desestructuración
         const { 
             titulo, descripcion, ubicacion, tipo, 
             jornada, modalidad, tipoSalario, salario, 
-            horario, fechaCierre, limitePostulantes, estado 
+            horario, fechaCierre, limitePostulantes, estado,
+            activa 
         } = req.body;
 
         const vacanteActualizada = await prisma.vacante.update({
@@ -248,10 +251,10 @@ export const actualizarVacante = async (req, res) => {
                 tipoSalario,
                 salario: salario || null,
                 horario,
-                // Conversión de tipos para Prisma
                 fechaCierre: fechaCierre ? new Date(fechaCierre) : null,
                 limitePostulantes: limitePostulantes ? parseInt(limitePostulantes) : null,
-                estado: estado || undefined // Mantiene el estado actual si no se envía
+                estado: estado || undefined,
+                activa: activa !== undefined ? activa : undefined // 🆕 Guardamos el estado booleano
             },
         });
 

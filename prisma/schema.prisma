@@ -110,6 +110,7 @@ model Empresa {
   beneficios           String?   // Para "Cultura y Beneficios"
   sitioWeb             String?   // Para "Sitio Web Oficial"
   linkedin             String?   // Para "Perfil de LinkedIn"
+  visibilidad          Json?
   // ------------------------------------
 
   nit                  String?   @unique

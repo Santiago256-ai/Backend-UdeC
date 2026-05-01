@@ -221,6 +221,7 @@ export const eliminarDefinitivamente = async (req, res) => {
 };
 
 // 🔵 5. Actualizar una vacante existente
+// 🔵 5. Actualizar una vacante existente
 export const actualizarVacante = async (req, res) => {
     try {
         const { id } = req.params;
@@ -230,27 +231,16 @@ export const actualizarVacante = async (req, res) => {
             return res.status(400).json({ error: "ID de vacante inválido." });
         }
 
-        // Extraemos todos los posibles campos, incluyendo el nuevo campo 'activa'
+        // 🚨 Quitamos 'activa' de aquí
         const { 
-            titulo, 
-            descripcion, 
-            ubicacion, 
-            tipo, 
-            jornada, 
-            modalidad, 
-            tipoSalario, 
-            salario, 
-            horario, 
-            fechaCierre, 
-            limitePostulantes, 
-            estado,
-            activa // 🆕 Nuevo campo para desactivación manual
+            titulo, descripcion, ubicacion, tipo, 
+            jornada, modalidad, tipoSalario, salario, 
+            horario, fechaCierre, limitePostulantes, estado 
         } = req.body;
 
         const vacanteActualizada = await prisma.vacante.update({
             where: { id: idNumerico },
             data: {
-                // Usamos validaciones por cada campo para permitir actualizaciones parciales
                 titulo: titulo !== undefined ? titulo : undefined,
                 descripcion: descripcion !== undefined ? descripcion : undefined,
                 ubicacion: ubicacion !== undefined ? ubicacion : undefined,
@@ -259,35 +249,18 @@ export const actualizarVacante = async (req, res) => {
                 modalidad: modalidad !== undefined ? modalidad : undefined,
                 tipoSalario: tipoSalario !== undefined ? tipoSalario : undefined,
                 horario: horario !== undefined ? horario : undefined,
-                
-                // Manejo especial para campos que pueden ser null o requieren conversión
                 salario: salario !== undefined ? (salario || null) : undefined,
-                
-                fechaCierre: fechaCierre !== undefined 
-                    ? (fechaCierre ? new Date(fechaCierre) : null) 
-                    : undefined,
-                
-                limitePostulantes: limitePostulantes !== undefined 
-                    ? (limitePostulantes ? parseInt(limitePostulantes) : null) 
-                    : undefined,
-                
-                estado: estado !== undefined ? estado : undefined,
-                
-                // 🆕 Actualización del estado de activación manual
-                activa: activa !== undefined ? activa : undefined
+                fechaCierre: fechaCierre !== undefined ? (fechaCierre ? new Date(fechaCierre) : null) : undefined,
+                limitePostulantes: limitePostulantes !== undefined ? (limitePostulantes ? parseInt(limitePostulantes) : null) : undefined,
+                // 👇 Solo usaremos 'estado'
+                estado: estado !== undefined ? estado : undefined
             },
         });
 
-        console.log("✅ Vacante actualizada exitosamente:", idNumerico);
         res.json(vacanteActualizada);
-
     } catch (error) {
-        // Log detallado para identificar si el error es de base de datos o de código
         console.error("❌ Error al actualizar vacante:", error.message);
-        res.status(500).json({ 
-            error: "Error interno al actualizar la vacante.",
-            detalle: error.message 
-        });
+        res.status(500).json({ error: "Error interno al actualizar la vacante." });
     }
 };
 

@@ -96,35 +96,43 @@ model Referencia {
 }
 
 model Empresa {
-  id                   Int       @id @default(autoincrement())
-  email                String    @unique
-  password             String
-  resetToken           String?   @unique
-  resetTokenExpiry     DateTime?
-  nombre               String
-  phones               String
-  contactName          String
-  nit                  String?   @unique
-  modalidad            String?
-  address              String
-  city                 String
-  department           String
-  companyType          String
-  economicSector       String[]
-  foundationYear       Int
-  employees            String
-  annualRevenue        String
-  totalAssets          String?
-  equity               String?
-  distributionChannels String[]
-  mainClients          String
-  emailAuthorization   Boolean   @default(false)
-  createdAt            DateTime  @default(now())
-  mensajesEnviados     Mensaje[] @relation("EmpresaSentMessages")
-  vacantes             Vacante[]
-  notificaciones       Notificacion[]
-  estado          String     @default("ACTIVO")
-  updatedAt       DateTime   @default(now()) @updatedAt
+  id                   Int       @id @default(autoincrement())
+  email                String    @unique
+  password             String
+  resetToken           String?   @unique
+  resetTokenExpiry     DateTime?
+  nombre               String
+  phones               String
+  contactName          String
+  
+  // --- NUEVOS CAMPOS PARA EL PERFIL ---
+  descripcion          String?   // Para la sección "Sobre Nosotros"
+  beneficios           String?   // Para "Cultura y Beneficios"
+  sitioWeb             String?   // Para "Sitio Web Oficial"
+  linkedin             String?   // Para "Perfil de LinkedIn"
+  // ------------------------------------
+
+  nit                  String?   @unique
+  modalidad            String?
+  address              String
+  city                 String
+  department           String
+  companyType          String
+  economicSector       String[]
+  foundationYear       Int
+  employees            String
+  annualRevenue        String
+  totalAssets          String?
+  equity               String?
+  distributionChannels String[]
+  mainClients          String
+  emailAuthorization   Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  mensajesEnviados     Mensaje[] @relation("EmpresaSentMessages")
+  vacantes             Vacante[]
+  notificaciones       Notificacion[]
+  estado               String     @default("ACTIVO")
+  updatedAt            DateTime   @default(now()) @updatedAt
 }
 
 model Vacante {

@@ -168,11 +168,19 @@ export const eliminarEmpresaAdmin = async (req, res) => {
 };
 
 // 🟢 NUEVO: Obtener perfil de una sola empresa por ID
+// 🟢 NUEVO: Obtener perfil de una sola empresa por ID (Actualizado con vacantes)
 export const obtenerPerfilEmpresa = async (req, res) => {
     try {
         const { id } = req.params;
         const empresa = await prisma.empresa.findUnique({
             where: { id: parseInt(id) },
+            // 👇 ESTO ES LO NUEVO: Traemos las vacantes activas 👇
+            include: {
+                vacantes: {
+                    where: { estado: "ABIERTA" },
+                    orderBy: { fechaCreacion: "desc" }
+                }
+            }
         });
 
         if (!empresa) {

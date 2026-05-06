@@ -105,6 +105,7 @@ if (!companyName || !email || !phones || !contactName || !address || !city || !d
 };
 
 // Listar todas las empresas (Se mantiene igual)
+// Listar todas las empresas (Actualizado para el directorio de egresados)
 export const listarEmpresas = async (req, res) => {
     try {
         const empresas = await prisma.empresa.findMany({
@@ -113,7 +114,13 @@ export const listarEmpresas = async (req, res) => {
                 id: true,
                 nombre: true,
                 email: true,
-                // ... (campos de información pública)
+                // 🟢 CAMPOS AGREGADOS PARA LA VISTA DE EMPRESAS ALIADAS:
+                estado: true,
+                economicSector: true,
+                city: true,
+                department: true,
+                employees: true,
+                modalidad: true
             }
         });
         res.json(empresas);

@@ -199,6 +199,7 @@ export const obtenerPerfilEmpresa = async (req, res) => {
 };
 
 // 🟢 ACTUALIZADO: Actualizar información de la empresa (Con validación de identidad)
+// 🟢 ACTUALIZADO: Actualizar información de la empresa (Con validación de identidad)
 export const actualizarEmpresa = async (req, res) => {
     try {
         const { id } = req.params;
@@ -206,26 +207,28 @@ export const actualizarEmpresa = async (req, res) => {
         const dataToUpdate = req.body;
 
         // 🛡️ SEGURIDAD 1: Validar que el ID del token (req.user) coincida con el ID de la URL
-        // Tu middleware guarda los datos en req.user
         if (req.user.id !== idNumerico) {
             return res.status(403).json({ 
                 error: "No tienes permisos para modificar este perfil. Acción denegada." 
             });
         }
 
-        // 🛡️ SEGURIDAD 2: Protegemos campos sensibles que NO deben cambiarse por aquí
+        // 🛡️ SEGURIDAD 2: Protegemos campos sensibles y RELACIONALES
         delete dataToUpdate.email;
         delete dataToUpdate.password;
         delete dataToUpdate.id;
         delete dataToUpdate.createdAt; // Campo de sistema
+        
+        // 👈 NUEVAS REGLAS DE LIMPIEZA:
+        delete dataToUpdate.updatedAt; // Evita conflictos con la fecha automática
+        delete dataToUpdate.vacantes;  // CRÍTICO: Prisma crashea si dejas este array
+        delete dataToUpdate.resetToken; 
+        delete dataToUpdate.resetTokenExpiry;
 
         // 🛠️ FORMATEO: Aseguramos que los tipos de datos coincidan con Prisma
         if (dataToUpdate.foundationYear) {
             dataToUpdate.foundationYear = parseInt(dataToUpdate.foundationYear);
         }
-        
-        // Si manejas arrays (como sectores o canales), Prisma los actualiza directamente 
-        // si vienen como un arreglo en el JSON.
 
         const empresaActualizada = await prisma.empresa.update({
             where: { id: idNumerico },
@@ -244,7 +247,6 @@ export const actualizarEmpresa = async (req, res) => {
     } catch (error) {
         console.error("❌ Error al actualizar empresa:", error);
         
-        // Manejo específico si intentan poner un NIT que ya existe en otra empresa
         if (error.code === 'P2002') {
             return res.status(409).json({ error: "El NIT ingresado ya está registrado por otra empresa." });
         }

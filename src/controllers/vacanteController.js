@@ -416,3 +416,50 @@ export const obtenerEstadisticasAdmin = async (req, res) => {
         });
     }
 };
+
+// 🟢 NUEVO: Dashboard de Métricas PRO para la Empresa
+export const obtenerDashboardMetricasPro = async (req, res) => {
+    try {
+        const { id } = req.params; // Ojo: en tu ruta actual recibes el ID de la empresa aquí
+        const empresaIdNumerico = parseInt(id);
+
+        if (isNaN(empresaIdNumerico)) {
+            return res.status(400).json({ error: "ID de empresa inválido." });
+        }
+
+        // 1. Todas las vacantes para KPIs y Gráficos
+        const vacantes = await prisma.vacante.findMany({
+            where: { empresaId: empresaIdNumerico },
+            orderBy: { fechaCreacion: 'desc' },
+            include: { _count: { select: { postulaciones: true } } }
+        });
+
+        // 2. Últimas 5 Postulaciones (Relacional: Vacante -> Empresa)
+        const postulacionesRecientes = await prisma.postulacion.findMany({
+            where: { vacante: { empresaId: empresaIdNumerico } },
+            orderBy: { fecha: 'desc' },
+            take: 5,
+            include: {
+                vacante: { select: { titulo: true } },
+                egresado: { select: { nombres: true, apellidos: true } }
+            }
+        });
+
+        // 3. Últimas Notificaciones de la empresa
+        const notificacionesRecientes = await prisma.notificacion.findMany({
+            where: { empresaId: empresaIdNumerico },
+            orderBy: { fecha: 'desc' },
+            take: 5
+        });
+
+        res.json({
+            vacantes,
+            postulacionesRecientes,
+            notificacionesRecientes
+        });
+
+    } catch (error) {
+        console.error("❌ Error en métricas PRO:", error);
+        res.status(500).json({ error: "No se pudieron cargar las métricas operativas." });
+    }
+};

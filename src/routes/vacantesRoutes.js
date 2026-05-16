@@ -7,42 +7,55 @@ import {
     listarTodasLasVacantesAdmin,
     obtenerEstadisticasAdmin,
     actualizarVacante,
-    reactivarVacante,          // 🆕 Nueva importación
-    eliminarDefinitivamente    // 🆕 Nueva importación
+    reactivarVacante,
+    eliminarDefinitivamente,
+    obtenerDashboardMetricasPro
 } from "../controllers/vacanteController.js";
 
 const router = express.Router();
 
-// --- RUTAS PÚBLICAS / GENERALES ---
+// ==========================================
+//   1. RUTAS FIJAS O ESPECÍFICAS (Prioridad)
+// ==========================================
 
-// 🟢 Crear vacante
+// 🟢 Crear vacante (POST /)
 router.post("/", crearVacante); 
 
-// 🟢 Listar TODAS las vacantes (Para el feed de egresados - solo ABIERTAS)
+// 🟢 Listar todas las vacantes (GET /)
 router.get("/", listarVacantes); 
 
+// --- RUTAS DE ADMINISTRACIÓN GLOBAL ---
+router.get("/admin/todas", listarTodasLasVacantesAdmin);
+router.get("/stats", obtenerEstadisticasAdmin);
 
-// --- RUTAS DE GESTIÓN (Empresa) ---
 
-// 🔵 Actualizar vacante (Editar)
-router.put("/:id", actualizarVacante); 
+// ==========================================
+//   2. RUTAS CON SUB-RUTAS DINÁMICAS
+// ==========================================
 
-// ✅ Listar vacantes por ID de empresa (Soportará filtros por estado via Query Params)
+// 📊 Dashboard de Métricas PRO (Debe ir antes de cualquier /:id general)
+router.get("/empresa/:id/metricas-pro", obtenerDashboardMetricasPro);
+
+// ✅ Listar vacantes por ID de empresa
 router.get("/empresa/:id", listarVacantesPorEmpresa);
 
 // ♻️ Reactivar una vacante (Mover de Eliminadas a Activas)
 router.put("/:id/reactivar", reactivarVacante);
 
-// 🔴 Mover a la papelera (Borrado Lógico - Cambia estado a "ELIMINADA")
-router.delete("/:id", eliminarVacante);
-
-// 💀 Eliminar DEFINITIVAMENTE (Borrado físico de la base de datos)
+// 💀 Eliminar DEFINITIVAMENTE (Debe ir antes del DELETE /:id general)
 router.delete("/:id/definitivo", eliminarDefinitivamente);
 
 
-// --- RUTAS DE ADMINISTRACIÓN ---
+// ==========================================
+//   3. RUTAS DINÁMICAS GENERALES (Al Final)
+// ==========================================
 
-router.get("/admin/todas", listarTodasLasVacantesAdmin);
-router.get("/stats", obtenerEstadisticasAdmin);
+// 1. Métodos PUT generales
+// 🔵 Actualizar vacante (Editar / Cambiar estado)
+router.put("/:id", actualizarVacante); 
+
+// 2. Métodos DELETE generales
+// 🔴 Mover a la papelera (Borrado Lógico)
+router.delete("/:id", eliminarVacante);
 
 export default router;

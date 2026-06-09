@@ -1,5 +1,6 @@
 import prisma from "../prismaClient.js";
 import { createClient } from '@supabase/supabase-js';
+import { enviarCorreoCambioEstado } from '../services/emailService.js';
 
 // Inicialización de Supabase
 const supabase = createClient(
@@ -122,9 +123,7 @@ export const actualizarEstadoPostulacion = async (req, res) => {
         const estadosValidos = ["PENDIENTE", "REVISION", "ENTREVISTA", "PRUEBA", "FINALISTA", "CONTRATADO", "RECHAZADO"];
 
         if (!estadosValidos.includes(estado.toUpperCase())) {
-            return res.status(400).json({ 
-                error: `Estado '${estado}' no válido.` 
-            });
+            return res.status(400).json({ error: `Estado '${estado}' no válido.` });
         }
 
         // 1. Actualizamos la postulación
@@ -132,24 +131,35 @@ export const actualizarEstadoPostulacion = async (req, res) => {
             where: { id: postulacionId },
             data: { estado: estado.toUpperCase() },
             include: { 
-                egresado: true,
+                egresado: true, // ¡Genial! Aquí viene el correo y nombre
                 vacante: { select: { titulo: true, id: true } } 
             } 
         });
 
-        // 2. 🔔 NOTIFICACIÓN PARA EL EGRESADO
+        // 2. 🔔 NOTIFICACIÓN INTERNA PARA EL EGRESADO
         await prisma.notificacion.create({
             data: {
                 tipo: 'POSTULACION',
                 contenido: `Tu postulación a la vacante "${postulacionActualizada.vacante.titulo}" ha cambiado a: ${estado.toUpperCase()}`,
-                egresadoId: postulacionActualizada.egresadoId, // Destinatario: Egresado
-                empresaId: null, // 👈 IMPORTANTE: Aseguramos que sea null para que no le salga a la empresa
+                egresadoId: postulacionActualizada.egresadoId,
+                empresaId: null, 
                 referenciaId: postulacionActualizada.vacante.id, 
-                postulacionId: postulacionId, // 👈 Esto permite el resaltado naranja que programamos
+                postulacionId: postulacionId, 
                 vista: false,
                 fecha: new Date()
             }
         });
+
+        // 3. ✉️ ENVÍO DE CORREO ELECTRÓNICO (NUEVO)
+        // Lo ejecutamos de forma asíncrona pero sin un 'await' bloqueante estricto si no quieres
+        // que la respuesta de la API demore más mientras el servidor SMTP responde, 
+        // aunque un await normal es más seguro para manejar errores.
+        await enviarCorreoCambioEstado(
+            postulacionActualizada.egresado.correo,
+            postulacionActualizada.egresado.nombres,
+            postulacionActualizada.vacante.titulo,
+            estado.toUpperCase()
+        );
 
         console.log(`✅ Notificación de estado enviada al egresado: ${postulacionActualizada.egresado.correo}`);
         res.json(postulacionActualizada);

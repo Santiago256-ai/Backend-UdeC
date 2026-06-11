@@ -86,3 +86,66 @@ export const enviarCorreoCambioEstado = async (correo, nombres, tituloVacante, n
         console.error("❌ Error al enviar el correo transaccional:", error.message);
     }
 };
+
+// 💬 NUEVO: Notificación por correo de un nuevo mensaje de chat
+export const enviarCorreoNuevoMensaje = async ({ correo, nombres, nombreEmpresa, tituloVacante, contenidoMensaje, fechaEnvio, vacanteId, mensajeId }) => {
+    try {
+        // Construimos la URL enviando los parámetros de chat al dashboard del egresado
+        const urlChat = `${process.env.FRONTEND_URL}/vacantes-dashboard?chatVacanteId=${vacanteId}&chatMensajeId=${mensajeId}`;
+        
+        // Formateamos la hora en formato legible de 12 horas (AM/PM)
+        const horaFormateada = new Date(fechaEnvio).toLocaleTimeString('es-CO', { 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            hour12: true 
+        });
+
+        const mailOptions = {
+            from: '"Empres360 PRO" <notificaciones.empres360pro@gmail.com>', 
+            to: correo,
+            subject: `Tienes un nuevo mensaje de ${nombreEmpresa} en Empres360 PRO`,
+            html: `
+                <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: auto; border: 1px solid #ddd; border-top: 5px solid #00482b; border-radius: 8px; overflow: hidden;">
+                    
+                    <div style="padding: 20px; text-align: center; background-color: #f9f9f9;">
+                        <table width="100%" cellspacing="0" cellpadding="0" border="0">
+                            <tr>
+                                <td align="center" valign="middle">
+                                    <img src="https://frontend-ude-c.vercel.app/UdeC2.png" alt="Logo Universidad" style="max-height: 55px; display: inline-block; vertical-align: middle;" />
+                                    &nbsp;&nbsp;&nbsp;&nbsp;
+                                    <span style="display: inline-block; width: 2px; height: 45px; background-color: #00482b; vertical-align: middle; opacity: 0.3;"></span>
+                                    &nbsp;&nbsp;&nbsp;&nbsp;
+                                    <img src="https://frontend-ude-c.vercel.app/Logo.png" alt="Logo Empres360 PRO" style="max-height: 55px; display: inline-block; vertical-align: middle;" />
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <div style="padding: 20px;">
+                        <h2 style="color: #00482b;">¡Hola, ${nombres}!</h2>
+                        <p>La empresa <strong>${nombreEmpresa}</strong> te ha enviado un nuevo mensaje privado con respecto a la vacante <strong>"${tituloVacante}"</strong> a las ${horaFormateada}.</p>
+                        
+                        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #00482b; padding: 15px; border-radius: 8px; margin: 25px 0; font-style: italic; color: #475569; font-size: 14px; line-height: 1.5;">
+                            "${contenidoMensaje}"
+                        </div>
+
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="${urlChat}" style="background-color: #00482b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 14px;">
+                                Responder mensaje desde Empres360 PRO
+                            </a>
+                        </div>
+
+                        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+                        <p style="font-size: 12px; color: #999; text-align: center;">Este es un correo automático, por favor no respondas a este mensaje.</p>
+                    </div>
+                </div>
+            `
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log(`✉️ Correo de notificación de chat enviado exitosamente a: ${correo}`);
+        
+    } catch (error) {
+        console.error("❌ Error al enviar el correo de notificación de chat:", error.message);
+    }
+};

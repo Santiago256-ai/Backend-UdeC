@@ -1,16 +1,13 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
+import { enviarCorreoNuevoMensaje } from '../services/emailService.js'; // 👈 IMPORTACIÓN AÑADIDA
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
 /**
  * 1. ENVIAR MENSAJE
- * Sincronizado con los modelos Egresado y Empresa.
- */
-/**
- * 1. ENVIAR MENSAJE
- * Sincronizado con los modelos Egresado y Empresa.
+ * Sincronizado con los modelos Egresado y Empresa, y envío de correo.
  */
 router.post('/enviar', async (req, res) => {
     const { contenido, senderType, senderEmpresaId, senderEgresadoId, receiverId, vacanteId } = req.body;
@@ -23,7 +20,7 @@ router.post('/enviar', async (req, res) => {
         // 1. Buscamos el nombre de la vacante Y su empresaId dueña
         const vacanteInfo = await prisma.vacante.findUnique({
             where: { id: parseInt(vacanteId) },
-            select: { titulo: true, empresaId: true } // 👈 Añadimos empresaId aquí
+            select: { titulo: true, empresaId: true }
         });
 
         // 2. CREAMOS EL MENSAJE PRIMERO
@@ -40,7 +37,7 @@ router.post('/enviar', async (req, res) => {
 
         // 3. CREAMOS LA NOTIFICACIÓN DEPENDIENDO DE QUIÉN ENVÍA
         if (senderType === 'EMPRESA') {
-            // Si envía la empresa, notificamos al egresado
+            // Si envía la empresa, notificamos al egresado (Notificación interna)
             await prisma.notificacion.create({
                 data: {
                     tipo: 'MENSAJE',
@@ -52,15 +49,43 @@ router.post('/enviar', async (req, res) => {
                     vista: false
                 }
             });
+
+            // ✉️ NUEVO: DISPARAR NOTIFICACIÓN POR CORREO AL EGRESADO
+            // Ejecutamos consultas rápidas para armar los campos personalizados del correo
+            const [egresadoInfo, empresaInfo] = await Promise.all([
+                prisma.egresado.findUnique({
+                    where: { id: parseInt(receiverId) },
+                    select: { correo: true, nombres: true }
+                }),
+                prisma.empresa.findUnique({
+                    where: { id: parseInt(senderEmpresaId) },
+                    select: { nombre: true }
+                })
+            ]);
+
+            if (egresadoInfo && empresaInfo) {
+                // Se envía de forma asíncrona para no bloquear el hilo de respuesta
+                enviarCorreoNuevoMensaje({
+                    correo: egresadoInfo.correo,
+                    nombres: egresadoInfo.nombres,
+                    nombreEmpresa: empresaInfo.nombre,
+                    tituloVacante: vacanteInfo?.titulo || 'Oferta laboral',
+                    contenidoMensaje: contenido,
+                    fechaEnvio: nuevoMensaje.fechaEnvio,
+                    vacanteId: parseInt(vacanteId),
+                    mensajeId: nuevoMensaje.id
+                });
+            }
+
         } else if (senderType === 'USUARIO') {
             // Si envía el egresado, notificamos a la empresa dueña de la vacante
             await prisma.notificacion.create({
                 data: {
                     tipo: 'MENSAJE',
                     contenido: `Tienes un nuevo mensaje de un candidato en la vacante: "${vacanteInfo?.titulo || 'Oferta laboral'}"`,
-                    empresaId: vacanteInfo.empresaId, // 👈 Se lo mandamos a la empresa
-                    egresadoId: parseInt(senderEgresadoId), // Para saber quién lo envió
-                    referenciaId: parseInt(vacanteId), // ID de vacante para abrir el chat
+                    empresaId: vacanteInfo.empresaId, 
+                    egresadoId: parseInt(senderEgresadoId), 
+                    referenciaId: parseInt(vacanteId), 
                     mensajeId: nuevoMensaje.id,
                     vista: false
                 }
@@ -79,20 +104,15 @@ router.post('/enviar', async (req, res) => {
  * Filtra estrictamente por vacante y empresa para evitar fugas de datos.
  */
 router.get('/historial/:egresadoId/:empresaId/:vacanteId', async (req, res) => {
-    // 1. Sanitización de parámetros
     const eId = parseInt(req.params.egresadoId);
     const empId = parseInt(req.params.empresaId);
     const vId = parseInt(req.params.vacanteId);
 
-    // Validación rápida de tipos
     if (isNaN(eId) || isNaN(empId) || isNaN(vId)) {
         return res.status(400).json({ error: "IDs inválidos proporcionados." });
     }
 
     try {
-        // --- PASO 1: VALIDACIÓN DE SEGURIDAD (CROSS-TENANCY CHECK) ---
-        // Buscamos si existe la vacante Y si pertenece a la empresa que hace la petición.
-        // Si una empresa intenta ver un vId de otra empresa, esto devolverá null.
         const vacanteVerificada = await prisma.vacante.findFirst({
             where: {
                 id: vId,
@@ -107,8 +127,6 @@ router.get('/historial/:egresadoId/:empresaId/:vacanteId', async (req, res) => {
             });
         }
 
-        // --- PASO 2: OBTENER ESTADO DEL CHAT Y POSTULACIÓN ---
-        // Necesitamos saber si el chat está bloqueado (chatActivo)
         const postulacion = await prisma.postulacion.findUnique({
             where: {
                 vacanteId_egresadoId: {
@@ -122,27 +140,22 @@ router.get('/historial/:egresadoId/:empresaId/:vacanteId', async (req, res) => {
             return res.status(404).json({ error: "No existe una postulación para este chat." });
         }
 
-        // --- PASO 3: BUSCAR MENSAJES DEL HILO ---
-        // Filtramos por vacanteId. Como ya validamos arriba que vId es de empId,
-        // esto garantiza que solo se vean mensajes propios.
         const mensajes = await prisma.mensaje.findMany({
             where: {
                 vacanteId: vId,
-                // Filtramos que los mensajes sean específicamente entre este egresado y esta empresa
                 OR: [
                     { senderEmpresaId: empId, receiverId: eId },
                     { senderEgresadoId: eId, receiverId: empId }
                 ]
             },
             orderBy: { 
-                fechaEnvio: 'asc' // Cronología de chat estándar
+                fechaEnvio: 'asc' 
             }
         });
         
-        // --- PASO 4: RESPUESTA ---
         res.json({
             mensajes: mensajes,
-            chatActivo: postulacion.chatActivo // Controla si el input del front se habilita
+            chatActivo: postulacion.chatActivo 
         });
 
     } catch (error) {
@@ -155,13 +168,13 @@ router.get('/historial/:egresadoId/:empresaId/:vacanteId', async (req, res) => {
  * 3. MARCAR COMO LEÍDO (Versión Empresa)
  */
 router.put('/leer-mensajes', async (req, res) => {
-    const { egresadoId, empresaId, vacanteId } = req.body; // Recibimos datos por el body
+    const { egresadoId, empresaId, vacanteId } = req.body; 
     try {
         await prisma.mensaje.updateMany({
             where: {
                 vacanteId: parseInt(vacanteId),
-                senderEgresadoId: parseInt(egresadoId), // Mensajes del estudiante
-                receiverId: parseInt(empresaId),        // Recibidos por la empresa
+                senderEgresadoId: parseInt(egresadoId),
+                receiverId: parseInt(empresaId), 
                 read: false
             },
             data: { read: true }
@@ -175,7 +188,6 @@ router.put('/leer-mensajes', async (req, res) => {
 
 /**
  * 4. ACTUALIZAR ESTADO DEL CHAT (BLOQUEO)
- * Este es el endpoint que llama la empresa para cerrar o abrir el chat.
  */
 router.put('/status-chat', async (req, res) => {
     const { usuarioId, vacanteId, activo } = req.body;
@@ -183,7 +195,7 @@ router.put('/status-chat', async (req, res) => {
     try {
         await prisma.postulacion.update({
             where: {
-                vacanteId_egresadoId: { // Usamos el ID único compuesto de tu esquema
+                vacanteId_egresadoId: { 
                     vacanteId: parseInt(vacanteId),
                     egresadoId: parseInt(usuarioId)
                 }
@@ -204,11 +216,7 @@ router.put('/status-chat', async (req, res) => {
 });
 
 /**
- * 5. MIS CHATS (Para la lista de la izquierda de la empresa)
- */
-/**
  * 5. MIS CHATS (Vista Empresa) - CORREGIDO Y BLINDADO
- * Filtra para que una empresa solo vea candidatos con los que ELLA ha hablado.
  */
 router.get('/mis-chats/empresa/:empresaId', async (req, res) => {
     const empresaId = parseInt(req.params.empresaId);
@@ -216,9 +224,7 @@ router.get('/mis-chats/empresa/:empresaId', async (req, res) => {
     try {
         const postulaciones = await prisma.postulacion.findMany({
             where: {
-                // 1. La vacante debe ser de esta empresa
                 vacante: { empresaId: empresaId },
-                // 2. Filtro de seguridad: Solo si hay mensajes asociados a esta empresa
                 vacante: {
                     mensajes: {
                         some: {
@@ -243,7 +249,6 @@ router.get('/mis-chats/empresa/:empresaId', async (req, res) => {
         const resultado = await Promise.all(postulaciones.map(async (p) => {
             const egresadoId = p.egresadoId;
             
-            // CONTADOR DE PENDIENTES: Específico de esta empresa y este egresado
             const pendientes = await prisma.mensaje.count({
                 where: {
                     vacanteId: p.vacanteId,
@@ -253,7 +258,6 @@ router.get('/mis-chats/empresa/:empresaId', async (req, res) => {
                 }
             });
 
-            // BUSCAMOS EL ÚLTIMO MENSAJE: Para la previsualización en la lista
             const ultimoMsg = await prisma.mensaje.findFirst({
                 where: {
                     vacanteId: p.vacanteId,
@@ -265,8 +269,6 @@ router.get('/mis-chats/empresa/:empresaId', async (req, res) => {
                 orderBy: { fechaEnvio: 'desc' }
             });
 
-            // Si por alguna razón extraña no hay mensajes específicos para esta empresa,
-            // no devolvemos este chat en el mapeo (filtro de seguridad final)
             if (!ultimoMsg && pendientes === 0) return null;
 
             return {
@@ -283,7 +285,6 @@ router.get('/mis-chats/empresa/:empresaId', async (req, res) => {
             };
         }));
 
-        // Limpiamos los nulos y ordenamos por fecha (más reciente arriba)
         const resultadoFinal = resultado
             .filter(chat => chat !== null)
             .sort((a, b) => new Date(b.fechaUltimo) - new Date(a.fechaUltimo));
@@ -295,10 +296,6 @@ router.get('/mis-chats/empresa/:empresaId', async (req, res) => {
     }
 });
 
-/**
- * 6. MIS CHATS (Vista Egresado/Estudiante)
- * Muestra las empresas con las que el estudiante tiene chats.
- */
 /**
  * 6. MIS CHATS (Vista Egresado/Estudiante)
  */
@@ -319,7 +316,6 @@ router.get('/mis-chats/egresado/:egresadoId', async (req, res) => {
                     select: { 
                         titulo: true, 
                         empresaId: true,
-                        // ESTO ES LO QUE FALTABA:
                         empresa: { select: { nombre: true } } 
                     } 
                 }
@@ -330,7 +326,6 @@ router.get('/mis-chats/egresado/:egresadoId', async (req, res) => {
         const resultado = conversaciones.map(c => ({
             vacanteId: c.vacanteId,
             empresaId: c.senderEmpresaId || c.vacante?.empresaId, 
-            // Ahora c.vacante.empresa.nombre SÍ existirá
             nombreEmpresa: c.vacante?.empresa?.nombre || c.senderEmpresa?.nombre || "Empresa Aliada",
             tituloVacante: c.vacante?.titulo || "Vacante",
             ultimoMensaje: c.contenido,
@@ -355,8 +350,8 @@ router.put('/leer-mensajes-egresado', async (req, res) => {
         await prisma.mensaje.updateMany({
             where: {
                 vacanteId: parseInt(vacanteId),
-                senderEmpresaId: parseInt(empresaId), // Mensajes que vienen de la empresa
-                receiverId: parseInt(egresadoId),    // Recibidos por el estudiante
+                senderEmpresaId: parseInt(empresaId), 
+                receiverId: parseInt(egresadoId), 
                 read: false
             },
             data: { read: true }

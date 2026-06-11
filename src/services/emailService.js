@@ -8,14 +8,29 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// 👇 Recibimos el nombreEmpresa (5) y vacanteId (6)
-// 👇 Recibimos el postulacionId como sexto parámetro
+// 🟢 NUEVO: Función que asigna el color exacto según tu SolicitudesEgresado.module.css
+const obtenerEstilosEstado = (estado) => {
+    const estilos = {
+        'PENDIENTE': 'background-color: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;',
+        'REVISION': 'background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;',
+        'ENTREVISTA': 'background-color: #f3e8ff; color: #7e22ce; border: 1px solid #e9d5ff;',
+        'PRUEBA': 'background-color: #fef9c3; color: #a16207; border: 1px solid #fef08a;',
+        'FINALISTA': 'background-color: #dcfce7; color: #15803d; border: 1px solid #bbf7d0;',
+        'CONTRATADO': 'background-color: #006b3f; color: white; border: 1px solid #005a35;',
+        'RECHAZADO': 'background-color: #fee2e2; color: #b91c1c; border: 1px solid #fecaca;'
+    };
+    
+    // Si por alguna razón el estado no coincide, usamos el verde institucional por defecto
+    return estilos[estado.toUpperCase()] || 'background-color: #00482b; color: white; border: 1px solid #00482b;';
+};
+
+
 export const enviarCorreoCambioEstado = async (correo, nombres, tituloVacante, nuevoEstado, nombreEmpresa, postulacionId) => {
     try {
-        // 👇 CAMBIO: Le agregamos "?resaltar=" y el ID de la postulación a la ruta
         const urlVacante = `${process.env.FRONTEND_URL}/vacantes-dashboard?resaltar=${postulacionId}`;
         
-        // ... (el resto del código mailOptions y el botón se quedan exactamente igual)
+        // Obtenemos los colores dinámicos para este estado específico
+        const estilosDinamicos = obtenerEstilosEstado(nuevoEstado);
 
         const mailOptions = {
             from: '"Empres360 PRO" <notificaciones.empres360pro@gmail.com>', 
@@ -45,7 +60,8 @@ export const enviarCorreoCambioEstado = async (correo, nombres, tituloVacante, n
                         
                         <div style="margin: 30px 0; text-align: center;">
                             <span style="font-size: 14px; color: #666; display: block; margin-bottom: 5px;">Nuevo estado:</span>
-                            <span style="background-color: #00482b; color: white; padding: 8px 16px; border-radius: 20px; font-weight: bold; letter-spacing: 1px;">
+                            
+                            <span style="${estilosDinamicos} padding: 8px 16px; border-radius: 20px; font-weight: bold; letter-spacing: 1px; display: inline-block;">
                                 ${nuevoEstado}
                             </span>
                         </div>

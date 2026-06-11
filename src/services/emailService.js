@@ -8,16 +8,16 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// 🟢 NUEVO: Función que asigna el color exacto según tu SolicitudesEgresado.module.css
+// 🟢 Función actualizada con bordes oscuros iguales al color del texto
 const obtenerEstilosEstado = (estado) => {
     const estilos = {
-        'PENDIENTE': 'background-color: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;',
-        'REVISION': 'background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;',
-        'ENTREVISTA': 'background-color: #f3e8ff; color: #7e22ce; border: 1px solid #e9d5ff;',
-        'PRUEBA': 'background-color: #fef9c3; color: #a16207; border: 1px solid #fef08a;',
-        'FINALISTA': 'background-color: #dcfce7; color: #15803d; border: 1px solid #bbf7d0;',
-        'CONTRATADO': 'background-color: #006b3f; color: white; border: 1px solid #005a35;',
-        'RECHAZADO': 'background-color: #fee2e2; color: #b91c1c; border: 1px solid #fecaca;'
+        'PENDIENTE': 'background-color: #f1f5f9; color: #475569; border: 1px solid #475569;',
+        'REVISION':  'background-color: #e0f2fe; color: #0369a1; border: 1px solid #0369a1;',
+        'ENTREVISTA':'background-color: #f3e8ff; color: #7e22ce; border: 1px solid #7e22ce;', // Morado
+        'PRUEBA':    'background-color: #fef9c3; color: #a16207; border: 1px solid #a16207;', // Mostaza/Naranja
+        'FINALISTA': 'background-color: #dcfce7; color: #15803d; border: 1px solid #15803d;', // Verde
+        'CONTRATADO':'background-color: #006b3f; color: white;   border: 1px solid #005a35;', // Verde oscuro UdeC
+        'RECHAZADO': 'background-color: #fee2e2; color: #b91c1c; border: 1px solid #b91c1c;'  // Rojo
     };
     
     // Si por alguna razón el estado no coincide, usamos el verde institucional por defecto

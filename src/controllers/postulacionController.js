@@ -157,13 +157,14 @@ await prisma.notificacion.create({
 });
 
 // 3. ✉️ ENVÍO DE CORREO ELECTRÓNICO
+// 3. ✉️ ENVÍO DE CORREO ELECTRÓNICO
 await enviarCorreoCambioEstado(
     postulacionActualizada.egresado.correo,
     postulacionActualizada.egresado.nombres,
     postulacionActualizada.vacante.titulo,
     estado.toUpperCase(),
-    postulacionActualizada.vacante.empresa.nombre, // 👈 5to parámetro: El nombre de la empresa
-    postulacionActualizada.vacante.id              // 👈 6to parámetro: El ID de la vacante para el botón
+    postulacionActualizada.vacante.empresa.nombre, 
+    postulacionActualizada.id // 👈 CAMBIO: Ahora pasamos el ID de la postulación (ej: 115)
 );
 
 console.log(`✅ Notificación de estado enviada al egresado: ${postulacionActualizada.egresado.correo}`);

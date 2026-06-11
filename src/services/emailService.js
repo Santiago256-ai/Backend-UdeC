@@ -9,11 +9,13 @@ const transporter = nodemailer.createTransport({
 });
 
 // 👇 Recibimos el nombreEmpresa (5) y vacanteId (6)
-export const enviarCorreoCambioEstado = async (correo, nombres, tituloVacante, nuevoEstado, nombreEmpresa, vacanteId) => {
+// 👇 Recibimos el postulacionId como sexto parámetro
+export const enviarCorreoCambioEstado = async (correo, nombres, tituloVacante, nuevoEstado, nombreEmpresa, postulacionId) => {
     try {
-        // Armamos la URL usando tu variable de entorno del frontend
-        // ⚠️ CAMBIA "/vacantes/" si tu ruta en React se llama diferente
-        const urlVacante = `${process.env.FRONTEND_URL}/vacantes/${vacanteId}`;
+        // 👇 CAMBIO: Le agregamos "?resaltar=" y el ID de la postulación a la ruta
+        const urlVacante = `${process.env.FRONTEND_URL}/vacantes-dashboard?resaltar=${postulacionId}`;
+        
+        // ... (el resto del código mailOptions y el botón se quedan exactamente igual)
 
         const mailOptions = {
             from: '"Empres360 PRO" <notificaciones.empres360pro@gmail.com>', 

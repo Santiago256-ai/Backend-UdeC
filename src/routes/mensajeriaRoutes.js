@@ -64,8 +64,8 @@ router.post('/enviar', async (req, res) => {
             ]);
 
             if (egresadoInfo && empresaInfo) {
-                // 👇 AQUI ESTÁ LA MAGIA: Agregamos 'await'
-                await enviarCorreoNuevoMensaje({
+                // Se envía de forma asíncrona para no bloquear el hilo de respuesta
+                enviarCorreoNuevoMensaje({
                     correo: egresadoInfo.correo,
                     nombres: egresadoInfo.nombres,
                     nombreEmpresa: empresaInfo.nombre,
@@ -76,8 +76,6 @@ router.post('/enviar', async (req, res) => {
                     mensajeId: nuevoMensaje.id
                 });
             }
-
-        } else if (senderType === 'USUARIO') {
 
         } else if (senderType === 'USUARIO') {
             // Si envía el egresado, notificamos a la empresa dueña de la vacante

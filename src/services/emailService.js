@@ -90,23 +90,17 @@ export const enviarCorreoCambioEstado = async (correo, nombres, tituloVacante, n
 // 💬 NUEVO: Notificación por correo de un nuevo mensaje de chat
 export const enviarCorreoNuevoMensaje = async ({ correo, nombres, nombreEmpresa, tituloVacante, contenidoMensaje, fechaEnvio, vacanteId, mensajeId }) => {
     try {
+        // Construimos la URL enviando los parámetros de chat al dashboard del egresado
         const urlChat = `${process.env.FRONTEND_URL}/vacantes-dashboard?chatVacanteId=${vacanteId}&chatMensajeId=${mensajeId}`;
         
-        // 🟢 SOLUCIÓN A PRUEBA DE FALLOS: Ajuste manual para la hora de Colombia (UTC-5)
-        const fecha = new Date(fechaEnvio);
-        fecha.setHours(fecha.getHours() - 5); // Restamos 5 horas exactas
-
-        const fechaYHoraFormateada = fecha.toLocaleString('es-CO', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true
+        // Formateamos la hora en formato legible de 12 horas (AM/PM)
+        const horaFormateada = new Date(fechaEnvio).toLocaleTimeString('es-CO', { 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            hour12: true 
         });
 
         const mailOptions = {
-             // ... todo el resto de tu código de mailOptions se mantiene EXACTAMENTE igual
             from: '"Empres360 PRO" <notificaciones.empres360pro@gmail.com>', 
             to: correo,
             subject: `Tienes un nuevo mensaje de ${nombreEmpresa} en Empres360 PRO`,

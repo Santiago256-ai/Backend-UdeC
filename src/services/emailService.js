@@ -1,20 +1,21 @@
 import nodemailer from 'nodemailer';
 
-// Configuración del transportador SMTP
-// (Asegúrate de agregar estas variables en tu archivo .env)
 const transporter = nodemailer.createTransport({
-    service: 'gmail', // Al usar 'gmail', Nodemailer configura internamente el host y los puertos correctos
+    service: 'gmail',
     auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
     }
 });
 
-// 👇 Añadimos 'nombreEmpresa' como el quinto parámetro
-export const enviarCorreoCambioEstado = async (correo, nombres, tituloVacante, nuevoEstado, nombreEmpresa) => {
+// 👇 Recibimos el nombreEmpresa (5) y vacanteId (6)
+export const enviarCorreoCambioEstado = async (correo, nombres, tituloVacante, nuevoEstado, nombreEmpresa, vacanteId) => {
     try {
+        // Armamos la URL usando tu variable de entorno del frontend
+        // ⚠️ CAMBIA "/vacantes/" si tu ruta en React se llama diferente
+        const urlVacante = `${process.env.FRONTEND_URL}/vacantes/${vacanteId}`;
+
         const mailOptions = {
-            // Actualizamos el 'from' para que muestre el nombre del portal correctamente en la bandeja de entrada
             from: '"Empres360 PRO" <notificaciones.empres360pro@gmail.com>', 
             to: correo,
             subject: `Actualización de tu postulación: ${tituloVacante}`,
@@ -26,11 +27,9 @@ export const enviarCorreoCambioEstado = async (correo, nombres, tituloVacante, n
                             <tr>
                                 <td align="center" valign="middle">
                                     <img src="https://frontend-ude-c.vercel.app/UdeC2.png" alt="Logo Universidad" style="max-height: 55px; display: inline-block; vertical-align: middle;" />
-                                    
                                     &nbsp;&nbsp;&nbsp;&nbsp;
                                     <span style="display: inline-block; width: 2px; height: 45px; background-color: #00482b; vertical-align: middle; opacity: 0.3;"></span>
                                     &nbsp;&nbsp;&nbsp;&nbsp;
-                                    
                                     <img src="https://frontend-ude-c.vercel.app/Logo.png" alt="Logo Empres360 PRO" style="max-height: 55px; display: inline-block; vertical-align: middle;" />
                                 </td>
                             </tr>
@@ -49,7 +48,12 @@ export const enviarCorreoCambioEstado = async (correo, nombres, tituloVacante, n
                             </span>
                         </div>
 
-                        <p>Ingresa a Empres360 PRO para ver más detalles y continuar con tu proceso.</p>
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="${urlVacante}" style="background-color: #00482b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 14px;">
+                                Ver detalles de la vacante
+                            </a>
+                        </div>
+
                         <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
                         <p style="font-size: 12px; color: #999; text-align: center;">Este es un correo automático, por favor no respondas a este mensaje.</p>
                     </div>
@@ -61,7 +65,6 @@ export const enviarCorreoCambioEstado = async (correo, nombres, tituloVacante, n
         console.log(`✉️ Correo de estado enviado exitosamente a: ${correo}`);
         
     } catch (error) {
-        // Solo logueamos el error para que no tumbe la petición principal del usuario
         console.error("❌ Error al enviar el correo transaccional:", error.message);
     }
 };

@@ -92,9 +92,11 @@ export const enviarCorreoNuevoMensaje = async ({ correo, nombres, nombreEmpresa,
     try {
         const urlChat = `${process.env.FRONTEND_URL}/vacantes-dashboard?chatVacanteId=${vacanteId}&chatMensajeId=${mensajeId}`;
         
-        // 🟢 NUEVO: Formateamos forzando la zona horaria de Colombia y agregando la fecha
-        const fechaYHoraFormateada = new Date(fechaEnvio).toLocaleString('es-CO', {
-            timeZone: 'America/Bogota',
+        // 🟢 SOLUCIÓN A PRUEBA DE FALLOS: Ajuste manual para la hora de Colombia (UTC-5)
+        const fecha = new Date(fechaEnvio);
+        fecha.setHours(fecha.getHours() - 5); // Restamos 5 horas exactas
+
+        const fechaYHoraFormateada = fecha.toLocaleString('es-CO', {
             year: 'numeric',
             month: 'long',
             day: 'numeric',
@@ -104,6 +106,7 @@ export const enviarCorreoNuevoMensaje = async ({ correo, nombres, nombreEmpresa,
         });
 
         const mailOptions = {
+             // ... todo el resto de tu código de mailOptions se mantiene EXACTAMENTE igual
             from: '"Empres360 PRO" <notificaciones.empres360pro@gmail.com>', 
             to: correo,
             subject: `Tienes un nuevo mensaje de ${nombreEmpresa} en Empres360 PRO`,

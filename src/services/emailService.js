@@ -10,20 +10,37 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-export const enviarCorreoCambioEstado = async (correo, nombres, tituloVacante, nuevoEstado) => {
+// 👇 Añadimos 'nombreEmpresa' como el quinto parámetro
+export const enviarCorreoCambioEstado = async (correo, nombres, tituloVacante, nuevoEstado, nombreEmpresa) => {
     try {
         const mailOptions = {
-            from: '"Empres360 PRO" <notificaciones@tu-dominio.com>', 
+            // Actualizamos el 'from' para que muestre el nombre del portal correctamente en la bandeja de entrada
+            from: '"Empres360 PRO" <notificaciones.empres360pro@gmail.com>', 
             to: correo,
             subject: `Actualización de tu postulación: ${tituloVacante}`,
             html: `
                 <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: auto; border: 1px solid #ddd; border-top: 5px solid #00482b; border-radius: 8px; overflow: hidden;">
+                    
                     <div style="padding: 20px; text-align: center; background-color: #f9f9f9;">
-                        <img src="https://tu-dominio-en-vercel.com/assets/UdeC2.png" alt="Logo Universidad" style="max-height: 60px;" />
+                        <table width="100%" cellspacing="0" cellpadding="0" border="0">
+                            <tr>
+                                <td align="center" valign="middle">
+                                    <img src="https://frontend-ude-c.vercel.app/UdeC2.png" alt="Logo Universidad" style="max-height: 55px; display: inline-block; vertical-align: middle;" />
+                                    
+                                    &nbsp;&nbsp;&nbsp;&nbsp;
+                                    <span style="display: inline-block; width: 2px; height: 45px; background-color: #00482b; vertical-align: middle; opacity: 0.3;"></span>
+                                    &nbsp;&nbsp;&nbsp;&nbsp;
+                                    
+                                    <img src="https://frontend-ude-c.vercel.app/Logo.png" alt="Logo Empres360 PRO" style="max-height: 55px; display: inline-block; vertical-align: middle;" />
+                                </td>
+                            </tr>
+                        </table>
                     </div>
+
                     <div style="padding: 20px;">
                         <h2 style="color: #00482b;">¡Hola, ${nombres}!</h2>
-                        <p>Te escribimos para informarte que el estado de tu postulación a la vacante <strong>"${tituloVacante}"</strong> ha sido actualizado por la empresa.</p>
+                        
+                        <p>Te escribimos para informarte que el estado de tu postulación a la vacante <strong>"${tituloVacante}"</strong> ha sido actualizado por la empresa <strong>${nombreEmpresa}</strong>.</p>
                         
                         <div style="margin: 30px 0; text-align: center;">
                             <span style="font-size: 14px; color: #666; display: block; margin-bottom: 5px;">Nuevo estado:</span>

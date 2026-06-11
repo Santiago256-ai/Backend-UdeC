@@ -90,14 +90,17 @@ export const enviarCorreoCambioEstado = async (correo, nombres, tituloVacante, n
 // 💬 NUEVO: Notificación por correo de un nuevo mensaje de chat
 export const enviarCorreoNuevoMensaje = async ({ correo, nombres, nombreEmpresa, tituloVacante, contenidoMensaje, fechaEnvio, vacanteId, mensajeId }) => {
     try {
-        // Construimos la URL enviando los parámetros de chat al dashboard del egresado
         const urlChat = `${process.env.FRONTEND_URL}/vacantes-dashboard?chatVacanteId=${vacanteId}&chatMensajeId=${mensajeId}`;
         
-        // Formateamos la hora en formato legible de 12 horas (AM/PM)
-        const horaFormateada = new Date(fechaEnvio).toLocaleTimeString('es-CO', { 
-            hour: '2-digit', 
-            minute: '2-digit', 
-            hour12: true 
+        // 🟢 NUEVO: Formateamos forzando la zona horaria de Colombia y agregando la fecha
+        const fechaYHoraFormateada = new Date(fechaEnvio).toLocaleString('es-CO', {
+            timeZone: 'America/Bogota',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
         });
 
         const mailOptions = {

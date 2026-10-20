@@ -51,6 +51,13 @@ const CAMPOS_EMPRESA_PERFIL = {
     linkedin: true,
     visibilidad: true,
 };
+// Lo que PerfilEmpresa deja editar (los inputs del formulario + los interruptores
+// de visibilidad). nombre y nit llegan en el cuerpo pero el formulario no los edita.
+const CAMPOS_EMPRESA_PERFIL_EDITABLES = [
+    'phones', 'contactName', 'address', 'city', 'department', 'companyType', 'economicSector',
+    'foundationYear', 'employees', 'mainClients', 'modalidad', 'descripcion', 'beneficios',
+    'sitioWeb', 'linkedin', 'visibilidad',
+];
 
 // Crear una nueva empresa
 export const crearEmpresa = async (req, res) => {
@@ -250,44 +257,42 @@ export const actualizarEmpresa = async (req, res) => {
     try {
         const { id } = req.params;
         const idNumerico = parseInt(id);
-        const dataToUpdate = req.body;
 
-        // 🛡️ SEGURIDAD 1: Validar que el ID del token (req.user) coincida con el ID de la URL
-        if (req.user.id !== idNumerico) {
-            return res.status(403).json({ 
-                error: "No tienes permisos para modificar este perfil. Acción denegada." 
+        // 🛡️ SEGURIDAD 1: sólo una sesión de empresa, y sólo sobre su propio registro
+        // (un egresado con el mismo id numérico no puede editar la empresa)
+        if (req.user?.rol !== "empresa" || req.user.id !== idNumerico) {
+            return res.status(403).json({
+                error: "No tienes permisos para modificar este perfil. Acción denegada."
             });
         }
 
-        // 🛡️ SEGURIDAD 2: Protegemos campos sensibles y RELACIONALES
-        delete dataToUpdate.email;
-        delete dataToUpdate.password;
-        delete dataToUpdate.id;
-        delete dataToUpdate.createdAt; // Campo de sistema
-        
-        // 👈 NUEVAS REGLAS DE LIMPIEZA:
-        delete dataToUpdate.updatedAt; // Evita conflictos con la fecha automática
-        delete dataToUpdate.vacantes;  // CRÍTICO: Prisma crashea si dejas este array
-        delete dataToUpdate.resetToken; 
-        delete dataToUpdate.resetTokenExpiry;
+        // 🛡️ SEGURIDAD 2: lista explícita. Cualquier otro campo del cuerpo (estado,
+        // email, password, resetToken, resetTokenExpiry, nombre, nit, vacantes…) se ignora.
+        const dataToUpdate = {};
+        for (const campo of CAMPOS_EMPRESA_PERFIL_EDITABLES) {
+            if (req.body?.[campo] !== undefined) dataToUpdate[campo] = req.body[campo];
+        }
 
         // 🛠️ FORMATEO: Aseguramos que los tipos de datos coincidan con Prisma
         if (dataToUpdate.foundationYear) {
             dataToUpdate.foundationYear = parseInt(dataToUpdate.foundationYear);
         }
+        // El formulario muestra el sector como "Agro, Minería" y al editarlo lo envía
+        // como texto; Prisma espera una lista.
+        if (typeof dataToUpdate.economicSector === "string") {
+            dataToUpdate.economicSector = dataToUpdate.economicSector.split(",").map(s => s.trim()).filter(Boolean);
+        }
 
         const empresaActualizada = await prisma.empresa.update({
             where: { id: idNumerico },
-            data: dataToUpdate
+            data: dataToUpdate,
+            select: CAMPOS_EMPRESA_PERFIL
         });
 
-        // 🛡️ SEGURIDAD 3: Limpiar respuesta
-        const { password: _, ...empresaSinPass } = empresaActualizada;
-
         console.log(`✅ Perfil de empresa ID ${id} actualizado.`);
-        res.json({ 
-            message: "Perfil actualizado con éxito", 
-            empresa: empresaSinPass 
+        res.json({
+            message: "Perfil actualizado con éxito",
+            empresa: empresaActualizada
         });
 
     } catch (error) {

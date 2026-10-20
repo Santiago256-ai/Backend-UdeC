@@ -1,5 +1,6 @@
 import express from "express";
 import multer from "multer";
+import { authMiddleware } from "../middleware/authMiddleware.js";
 import { 
     crearPostulacion, 
     obtenerPostulacionesPorVacante,
@@ -38,13 +39,14 @@ router.post("/enviar", crearPostulacion);
 router.get("/empresa/:empresaId", obtenerPostulacionesPorEmpresa); 
 
 // Actualizar el estado de una postulación
-router.put("/:id/estado", actualizarEstadoPostulacion);
+// Sólo la empresa dueña de la vacante (token + verificación en el controlador)
+router.put("/:id/estado", authMiddleware, actualizarEstadoPostulacion);
 
 // Actualizar solo el anclaje (favoritos)
-router.put("/:id/anclaje", actualizarAnclajePostulacion); 
+router.put("/:id/anclaje", authMiddleware, actualizarAnclajePostulacion); 
 
 // Nueva ruta para que la empresa califique al egresado (Seguimiento Admin)
-router.put("/calificar/:id", calificarPostulacion);
+router.put("/calificar/:id", authMiddleware, calificarPostulacion);
 
 // --- PERFIL ADMINISTRADOR (UdeC) ---
 router.get("/admin/detalle-completo/:vacanteId", obtenerDetallePostulacionesAdmin);

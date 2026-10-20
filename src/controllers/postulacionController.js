@@ -8,6 +8,31 @@ const supabase = createClient(
     process.env.SUPABASE_ANON_KEY
 );
 
+// 🛡️ Gestión de postulaciones (estado, anclaje, calificación): sólo una sesión de
+// empresa y sólo sobre postulaciones de sus propias vacantes. Si no existe o es de
+// otra empresa responde el mismo 404, para no revelar qué postulaciones existen.
+// Devuelve el id numérico, o null si ya respondió.
+const verificarEmpresaDuena = async (req, res) => {
+    if (req.user?.rol !== "empresa") {
+        res.status(403).json({ error: "Sólo la empresa dueña de la vacante puede gestionar esta postulación." });
+        return null;
+    }
+    const postulacionId = parseInt(req.params.id);
+    if (isNaN(postulacionId)) {
+        res.status(400).json({ error: "Datos inválidos." });
+        return null;
+    }
+    const postulacion = await prisma.postulacion.findUnique({
+        where: { id: postulacionId },
+        select: { vacante: { select: { empresaId: true } } }
+    });
+    if (!postulacion || postulacion.vacante?.empresaId !== req.user.id) {
+        res.status(404).json({ error: "Postulación no encontrada." });
+        return null;
+    }
+    return postulacionId;
+};
+
 // 🟢 Crear una nueva postulación (CON VALIDACIONES DE LÍMITES)
 export const crearPostulacion = async (req, res) => {
   try {
@@ -119,10 +144,11 @@ export const obtenerPostulacionesPorVacante = async (req, res) => {
 // 🟢 ACTUALIZAR ESTADO DE POSTULACIÓN
 export const actualizarEstadoPostulacion = async (req, res) => {
     try {
-        const postulacionId = parseInt(req.params.id);
+        const postulacionId = await verificarEmpresaDuena(req, res);
+        if (postulacionId === null) return;
         const { estado } = req.body; 
 
-        if (isNaN(postulacionId) || !estado) {
+        if (!estado) {
             return res.status(400).json({ error: "Datos inválidos." });
         }
 
@@ -137,7 +163,7 @@ const postulacionActualizada = await prisma.postulacion.update({
     where: { id: postulacionId },
     data: { estado: estado.toUpperCase() },
     include: { 
-        egresado: true,
+        egresado: { select: { nombres: true, correo: true } }, // lo justo para el correo de aviso
         vacante: { 
             select: { 
                 titulo: true, 
@@ -173,8 +199,8 @@ await enviarCorreoCambioEstado(
     postulacionActualizada.id // 👈 CAMBIO: Ahora pasamos el ID de la postulación (ej: 115)
 );
 
-console.log(`✅ Notificación de estado enviada al egresado: ${postulacionActualizada.egresado.correo}`);
-res.json(postulacionActualizada);
+console.log(`✅ Notificación de estado enviada (postulación ${postulacionActualizada.id}).`);
+res.json({ id: postulacionActualizada.id, estado: postulacionActualizada.estado });
 
     } catch (error) {
         console.error("❌ Error al actualizar estado y notificar:", error.message);
@@ -244,15 +270,18 @@ export const obtenerTodasLasPostulacionesAdmin = async (req, res) => {
 // En controllers/postulacionController.js
 
 export const actualizarAnclajePostulacion = async (req, res) => {
-    const { id } = req.params;
     const { anclado } = req.body;
 
     try {
+        const postulacionId = await verificarEmpresaDuena(req, res);
+        if (postulacionId === null) return;
+
         const postulacionActualizada = await prisma.postulacion.update({
-            where: { id: parseInt(id) },
+            where: { id: postulacionId },
             data: { 
                 anclado: Boolean(anclado) 
-            }
+            },
+            select: { id: true, anclado: true }
         });
         res.json(postulacionActualizada);
     } catch (error) {
@@ -304,15 +333,17 @@ export const obtenerPostulacionesPorEmpresa = async (req, res) => {
 // 🔵 ACTUALIZADO: Calificar postulante (Seguimiento Admin)
 export const calificarPostulacion = async (req, res) => {
     try {
-        const { id } = req.params;
+        const postulacionId = await verificarEmpresaDuena(req, res);
+        if (postulacionId === null) return;
         const { calificacion, comentario } = req.body;
 
         const actualizada = await prisma.postulacion.update({
-            where: { id: parseInt(id) },
+            where: { id: postulacionId },
             data: {
                 calificacionAdmin: parseInt(calificacion),
                 comentarioAdmin: comentario
-            }
+            },
+            select: { id: true, calificacionAdmin: true, comentarioAdmin: true }
         });
 
         res.json({ message: "Calificación guardada", actualizada });

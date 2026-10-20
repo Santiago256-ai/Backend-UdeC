@@ -3,10 +3,6 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken'; 
 const prisma = new PrismaClient();
 
-// ⚠️ CLAVE SECRETA: Es crucial usar una clave compleja y leerla desde .env
-// Si usas dotenv, asegúrate de que se cargue al inicio de tu aplicación.
-const JWT_SECRET = process.env.JWT_SECRET || 'mi_clave_secreta_debes_cambiarla'; 
-
 // Contención (2026-10): las rutas de administración todavía no exigen rol, así
 // que sólo devuelven los campos que el panel muestra (lista y modal de detalle).
 // Nunca password, resetToken, resetTokenExpiry ni datos financieros.

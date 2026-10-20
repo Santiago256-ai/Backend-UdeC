@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'mi_clave_secreta_debes_cambiarla';
+import { JWT_SECRET } from "../config/jwtSecret.js";
 
 export const authMiddleware = (req, res, next) => {
     const authHeader = req.headers.authorization;

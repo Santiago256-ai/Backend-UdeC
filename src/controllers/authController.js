@@ -2,6 +2,7 @@
 
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { JWT_SECRET } from "../config/jwtSecret.js";
 import { PrismaClient } from "@prisma/client";
 import dotenv from "dotenv";
 import crypto from "crypto"; // ✅ Necesario para generar tokens aleatorios
@@ -81,7 +82,7 @@ export const login = async (req, res) => {
 
         const token = jwt.sign(
             { id: egresado.id, rol: "egresado" },
-            process.env.JWT_SECRET,
+            JWT_SECRET,
             { expiresIn: "1d" }
         );
 
@@ -112,7 +113,7 @@ export const login = async (req, res) => {
 
         const token = jwt.sign(
             { id: empresa.id, rol: "empresa" },
-            process.env.JWT_SECRET,
+            JWT_SECRET,
             { expiresIn: "1d" }
         );
 

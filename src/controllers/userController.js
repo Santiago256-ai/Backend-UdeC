@@ -2,12 +2,28 @@
 import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
+// Contención (2026-10): las rutas de administración todavía no exigen rol, así
+// que sólo devuelven los campos que el panel muestra. Nunca password,
+// resetToken, resetTokenExpiry ni firebaseUid.
+const CAMPOS_EGRESADO_ADMIN = {
+    id: true,
+    nombres: true,
+    apellidos: true,
+    correo: true,
+    celular: true,
+    facultad: true,
+    programa: true,
+    estado: true,
+    createdAt: true,
+};
+
 // ✅ Cambiado a un nombre más descriptivo y correcto
 export const obtenerTodosLosEgresados = async (req, res) => {
     try {
         // Consultamos la tabla 'egresado' que definimos en Prisma
         const egresados = await prisma.egresado.findMany({
-            include: {
+            select: {
+                ...CAMPOS_EGRESADO_ADMIN,
                 _count: {
                     select: { postulaciones: true }
                 }
@@ -44,12 +60,12 @@ export const actualizarEgresadoAdmin = async (req, res) => {
     try {
         const { id } = req.params;
         
-        // 1. Extraemos todos los campos del cuerpo de la petición
-        // Ponemos estado = "ACTIVO" como fallback por seguridad
+        // 1. Sólo los campos permitidos. El correo queda fuera: cambiarlo y pedir
+        // un restablecimiento permitiría tomar la cuenta (el panel lo sigue
+        // enviando y se ignora). Ponemos estado = "ACTIVO" como fallback por seguridad
         const { 
             nombres, 
             apellidos, 
-            correo, 
             celular, 
             facultad, 
             programa,
@@ -64,12 +80,12 @@ export const actualizarEgresadoAdmin = async (req, res) => {
             data: {
                 nombres,
                 apellidos,
-                correo,
                 celular,
                 facultad,
                 programa,
                 estado // 👈 Actualiza el estado (ACTIVO/INACTIVO)
-            }
+            },
+            select: CAMPOS_EGRESADO_ADMIN
         });
 
         // 3. Respondemos con éxito y el objeto actualizado

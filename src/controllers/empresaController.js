@@ -7,6 +7,27 @@ const prisma = new PrismaClient();
 // Si usas dotenv, asegúrate de que se cargue al inicio de tu aplicación.
 const JWT_SECRET = process.env.JWT_SECRET || 'mi_clave_secreta_debes_cambiarla'; 
 
+// Contención (2026-10): las rutas de administración todavía no exigen rol, así
+// que sólo devuelven los campos que el panel muestra (lista y modal de detalle).
+// Nunca password, resetToken, resetTokenExpiry ni datos financieros.
+const CAMPOS_EMPRESA_ADMIN = {
+    id: true,
+    nombre: true,
+    nit: true,
+    email: true,
+    phones: true,
+    contactName: true,
+    address: true,
+    city: true,
+    economicSector: true,
+    employees: true,
+    estado: true,
+    createdAt: true,
+};
+// Lo único que el modal de detalle edita, menos el correo (cambiarlo y pedir un
+// restablecimiento permitiría tomar la cuenta).
+const CAMPOS_EMPRESA_EDITABLES = ['nombre', 'nit', 'phones', 'contactName', 'address', 'city', 'economicSector', 'employees'];
+
 // Crear una nueva empresa
 export const crearEmpresa = async (req, res) => {
     try {
@@ -134,7 +155,8 @@ export const listarEmpresas = async (req, res) => {
 export const obtenerEmpresasParaAdmin = async (req, res) => {
     try {
         const empresas = await prisma.empresa.findMany({
-            include: {
+            select: {
+                ...CAMPOS_EMPRESA_ADMIN,
                 _count: {
                     select: { vacantes: true } // Mantiene el conteo de vacantes publicadas
                 }
@@ -144,7 +166,6 @@ export const obtenerEmpresasParaAdmin = async (req, res) => {
             orderBy: { createdAt: "desc" } 
         });
 
-        // Enviamos los datos completos (Prisma traerá automáticamente 'estado' y 'createdAt')
         res.json(empresas);
     } catch (error) {
         console.error("❌ Error en obtenerEmpresasParaAdmin:", error);
@@ -263,7 +284,8 @@ export const actualizarEstadoEmpresaAdmin = async (req, res) => {
 
         const actualizada = await prisma.empresa.update({
             where: { id: parseInt(id) },
-            data: { estado }
+            data: { estado },
+            select: CAMPOS_EMPRESA_ADMIN
         });
 
         res.json({ message: "Estado de empresa actualizado", empresa: actualizada });
@@ -278,22 +300,17 @@ export const actualizarEmpresaAdmin = async (req, res) => {
     try {
         const { id } = req.params;
         const idNumerico = parseInt(id);
-        const dataToUpdate = req.body;
-
-        // 🛡️ Limpiamos datos que no deben actualizarse directamente o metadatos
-        delete dataToUpdate.id;
-        delete dataToUpdate.createdAt;
-        delete dataToUpdate.password; 
-        delete dataToUpdate._count; // Muy importante quitar esto porque Prisma falla si intentas guardar el conteo de vacantes
-
-        // 🛠️ FORMATEO: Aseguramos tipos de datos correctos
-        if (dataToUpdate.foundationYear) {
-            dataToUpdate.foundationYear = parseInt(dataToUpdate.foundationYear);
+        // 🛡️ Lista explícita: cualquier otro campo del cuerpo (email, password,
+        // resetToken, resetTokenExpiry, estado, _count…) se ignora.
+        const dataToUpdate = {};
+        for (const campo of CAMPOS_EMPRESA_EDITABLES) {
+            if (req.body?.[campo] !== undefined) dataToUpdate[campo] = req.body[campo];
         }
 
         const empresaActualizada = await prisma.empresa.update({
             where: { id: idNumerico },
-            data: dataToUpdate
+            data: dataToUpdate,
+            select: CAMPOS_EMPRESA_ADMIN
         });
 
         console.log(`✅ Expediente de empresa ID ${id} actualizado por ADMIN.`);
@@ -306,7 +323,7 @@ export const actualizarEmpresaAdmin = async (req, res) => {
         console.error("❌ Error en actualizarEmpresaAdmin:", error);
         
         if (error.code === 'P2002') {
-            return res.status(409).json({ error: "El NIT o Correo ingresado ya está registrado en otra empresa." });
+            return res.status(409).json({ error: "El NIT ingresado ya está registrado en otra empresa." });
         }
 
         res.status(500).json({ error: "No se pudo actualizar la información de la empresa." });

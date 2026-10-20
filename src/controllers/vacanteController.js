@@ -129,7 +129,11 @@ export const listarVacantes = async (req, res) => {
                 ],
             },
             include: {
-                empresa: true,
+                // Ruta pública: de la empresa sólo lo que muestra el feed (nombre y
+                // enlace al perfil). Nunca password, resetToken ni datos financieros.
+                empresa: {
+                    select: { id: true, nombre: true }
+                },
                 postulaciones: {
                     select: {
                         id: true,

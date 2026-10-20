@@ -6,7 +6,7 @@ import express from 'express';
 import request from 'supertest';
 
 const db = vi.hoisted(() => ({
-  egresado: { findMany: vi.fn(), update: vi.fn(), delete: vi.fn() },
+  egresado: { findMany: vi.fn(), update: vi.fn(), delete: vi.fn(), findUnique: vi.fn() },
   empresa: { findMany: vi.fn(), update: vi.fn(), delete: vi.fn(), findUnique: vi.fn() },
 }));
 vi.mock('@prisma/client', () => ({ PrismaClient: vi.fn(() => db) }));
@@ -40,6 +40,7 @@ beforeEach(() => {
     modelo.findMany.mockImplementation(async ({ select }) => [proyectar(select)]);
     modelo.update.mockImplementation(async ({ select }) => proyectar(select));
   }
+  db.egresado.findUnique.mockResolvedValue({ estado: 'ACTIVO' });
 });
 
 const sinCampos = (obj, campos) => campos.filter((c) => c in obj);
@@ -67,7 +68,7 @@ describe('PUT /api/usuarios/:id', () => {
     expect(res.status).toBe(200);
     const { data, select, where } = db.egresado.update.mock.calls[0][0];
     expect(where).toEqual({ id: 7 });
-    expect(Object.keys(data).sort()).toEqual(['apellidos', 'celular', 'estado', 'facultad', 'nombres', 'programa']);
+    expect(Object.keys(data).sort()).toEqual(['apellidos', 'celular', 'facultad', 'nombres', 'programa']);
     expect(sinCampos(select, PROHIBIDOS)).toEqual([]);
     expect(sinCampos(res.body.usuario, PROHIBIDOS)).toEqual([]);
   });
@@ -76,6 +77,35 @@ describe('PUT /api/usuarios/:id', () => {
     const res = await request(app).put('/api/usuarios/7').send({ ...filaCompleta, nombres: 'Laura' });
     expect(res.status).toBe(200);
     expect(db.egresado.update.mock.calls[0][0].data.nombres).toBe('Laura');
+  });
+
+  // Opción A: activar o desactivar queda bloqueado hasta que exista el rol.
+  it('rechaza con 403 un cambio de estado (botón activar/desactivar) y no escribe nada', async () => {
+    const res = await request(app).put('/api/usuarios/7').send({ ...filaCompleta, estado: 'INACTIVO' });
+    expect(res.status).toBe(403);
+    expect(db.egresado.update).not.toHaveBeenCalled();
+  });
+
+  it('sin estado en el cuerpo ya no reactiva la cuenta (antes ponía ACTIVO por defecto)', async () => {
+    const res = await request(app).put('/api/usuarios/7').send({ nombres: 'Laura' });
+    expect(res.status).toBe(200);
+    expect('estado' in db.egresado.update.mock.calls[0][0].data).toBe(false);
+  });
+});
+
+describe('DELETE /api/usuarios/:id', () => {
+  it('responde 403 y no borra', async () => {
+    const res = await request(app).delete('/api/usuarios/7');
+    expect(res.status).toBe(403);
+    expect(db.egresado.delete).not.toHaveBeenCalled();
+  });
+});
+
+describe('DELETE /api/empresas/admin/:id', () => {
+  it('responde 403 y no borra', async () => {
+    const res = await request(app).delete('/api/empresas/admin/7');
+    expect(res.status).toBe(403);
+    expect(db.empresa.delete).not.toHaveBeenCalled();
   });
 });
 
@@ -114,10 +144,9 @@ describe('PUT /api/empresas/admin/:id', () => {
 });
 
 describe('PUT /api/empresas/admin/estado/:id', () => {
-  it('la respuesta ya no incluye secretos', async () => {
+  it('responde 403 y no cambia el estado', async () => {
     const res = await request(app).put('/api/empresas/admin/estado/7').send({ estado: 'INACTIVO' });
-    expect(res.status).toBe(200);
-    expect(db.empresa.update.mock.calls[0][0].data).toEqual({ estado: 'INACTIVO' });
-    expect(sinCampos(res.body.empresa, [...PROHIBIDOS, ...FINANCIEROS])).toEqual([]);
+    expect(res.status).toBe(403);
+    expect(db.empresa.update).not.toHaveBeenCalled();
   });
 });

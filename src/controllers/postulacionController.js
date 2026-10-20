@@ -80,9 +80,15 @@ export const obtenerPostulacionesPorVacante = async (req, res) => {
 
         const postulaciones = await prisma.postulacion.findMany({
             where: { vacanteId },
-            include: { 
+            include: {
+                // Sólo lo que leen la tabla de postulantes, el chat y la hoja de vida
+                // (VerCV). Nunca password, resetToken, resetTokenExpiry ni firebaseUid.
                 egresado: {
-                    include: {
+                    select: {
+                        id: true,
+                        nombres: true,
+                        apellidos: true,
+                        correo: true,
                         cv: {
                             include: {
                                 // Nombres exactos de las relaciones en tu PerfilCV (schema.prisma)

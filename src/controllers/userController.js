@@ -59,31 +59,48 @@ export const eliminarEgresado = async (req, res) => {
 export const actualizarEgresadoAdmin = async (req, res) => {
     try {
         const { id } = req.params;
-        
+
         // 1. Sólo los campos permitidos. El correo queda fuera: cambiarlo y pedir
         // un restablecimiento permitiría tomar la cuenta (el panel lo sigue
-        // enviando y se ignora). Ponemos estado = "ACTIVO" como fallback por seguridad
-        const { 
-            nombres, 
-            apellidos, 
-            celular, 
-            facultad, 
+        // enviando y se ignora).
+        const {
+            nombres,
+            apellidos,
+            celular,
+            facultad,
             programa,
-            estado = "ACTIVO" 
+            estado
         } = req.body;
 
-        // 2. Ejecutamos la actualización en la base de datos (Neon/Prisma)
+        // 2. Contención (2026-10): activar o desactivar queda bloqueado hasta que
+        // exista el rol de administrador. El modal de edición reenvía el estado
+        // actual, así que sólo se rechaza un cambio real; el estado nunca se escribe.
+        if (estado !== undefined) {
+            const actual = await prisma.egresado.findUnique({
+                where: { id: parseInt(id) },
+                select: { estado: true }
+            });
+            if (!actual) {
+                return res.status(404).json({ error: "El egresado no fue encontrado en la base de datos." });
+            }
+            if (estado !== actual.estado) {
+                return res.status(403).json({
+                    error: "Activar o desactivar egresados está deshabilitado temporalmente mientras se habilita el acceso de administrador."
+                });
+            }
+        }
+
+        // 3. Ejecutamos la actualización en la base de datos (Neon/Prisma)
         const actualizado = await prisma.egresado.update({
-            where: { 
-                id: parseInt(id) 
+            where: {
+                id: parseInt(id)
             },
             data: {
                 nombres,
                 apellidos,
                 celular,
                 facultad,
-                programa,
-                estado // 👈 Actualiza el estado (ACTIVO/INACTIVO)
+                programa
             },
             select: CAMPOS_EGRESADO_ADMIN
         });

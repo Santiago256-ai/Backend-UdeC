@@ -27,6 +27,30 @@ const CAMPOS_EMPRESA_ADMIN = {
 // Lo único que el modal de detalle edita, menos el correo (cambiarlo y pedir un
 // restablecimiento permitiría tomar la cuenta).
 const CAMPOS_EMPRESA_EDITABLES = ['nombre', 'nit', 'phones', 'contactName', 'address', 'city', 'economicSector', 'employees'];
+// GET /empresas/:id lo usan el perfil propio (PerfilEmpresa) y la vista del
+// egresado (VerPerfilEmpresa): sólo los campos que leen. Fuera email, password,
+// resetToken, resetTokenExpiry y datos financieros.
+const CAMPOS_EMPRESA_PERFIL = {
+    id: true,
+    nombre: true,
+    nit: true,
+    phones: true,
+    contactName: true,
+    address: true,
+    city: true,
+    department: true,
+    companyType: true,
+    economicSector: true,
+    foundationYear: true,
+    employees: true,
+    mainClients: true,
+    modalidad: true,
+    descripcion: true,
+    beneficios: true,
+    sitioWeb: true,
+    linkedin: true,
+    visibilidad: true,
+};
 
 // Crear una nueva empresa
 export const crearEmpresa = async (req, res) => {
@@ -195,12 +219,15 @@ export const obtenerPerfilEmpresa = async (req, res) => {
         const { id } = req.params;
         const empresa = await prisma.empresa.findUnique({
             where: { id: parseInt(id) },
-            include: {
+            select: {
+                ...CAMPOS_EMPRESA_PERFIL,
                 vacantes: {
                     where: { estado: "ABIERTA" }, // 👈 REGLA 1: Solo vacantes activas
                     orderBy: { fechaCreacion: "desc" },
                     include: {
-                        postulaciones: true // 👈 REGLA 2: Traer postulaciones para saber si ya aplicó
+                        // 👈 REGLA 2: sólo para saber si ya aplicó y cuántos van
+                        // (sin teléfono ni notas de los postulantes)
+                        postulaciones: { select: { id: true, egresadoId: true } }
                     }
                 }
             }
@@ -210,9 +237,7 @@ export const obtenerPerfilEmpresa = async (req, res) => {
             return res.status(404).json({ error: "Empresa no encontrada" });
         }
 
-        // Excluimos la contraseña por seguridad
-        const { password: _, ...datosEmpresa } = empresa;
-        res.json(datosEmpresa);
+        res.json(empresa);
     } catch (error) {
         console.error("❌ Error al obtener perfil:", error);
         res.status(500).json({ error: "Error al cargar el perfil" });

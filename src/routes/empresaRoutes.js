@@ -1,13 +1,12 @@
 import { Router } from "express";
 import { authMiddleware } from "../middleware/authMiddleware.js"; // 👈 Nombre exacto
-import { 
-    crearEmpresa, 
-    listarEmpresas, 
+import { bloqueoTemporal } from "../middleware/bloqueoTemporal.js";
+import {
+    crearEmpresa,
+    listarEmpresas,
     obtenerEmpresasParaAdmin,
-    eliminarEmpresaAdmin,
     obtenerPerfilEmpresa, // 👈 Agregar
     actualizarEmpresa,    // 👈 Agregar
-    actualizarEstadoEmpresaAdmin,
     actualizarEmpresaAdmin
 } from "../controllers/empresaController.js";
 
@@ -22,8 +21,9 @@ router.get("/:id", authMiddleware, obtenerPerfilEmpresa);
 router.put("/:id", authMiddleware, actualizarEmpresa);
 
 router.get("/admin/todas", obtenerEmpresasParaAdmin);
-router.delete("/admin/:id", eliminarEmpresaAdmin);
-router.put('/admin/estado/:id', actualizarEstadoEmpresaAdmin);
+// eliminarEmpresaAdmin y actualizarEstadoEmpresaAdmin, hasta que exista el rol de administrador
+router.delete("/admin/:id", bloqueoTemporal);
+router.put('/admin/estado/:id', bloqueoTemporal);
 router.put('/admin/:id', actualizarEmpresaAdmin);
 
 export default router;

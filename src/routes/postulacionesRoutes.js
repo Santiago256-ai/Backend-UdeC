@@ -1,13 +1,12 @@
 import express from "express";
 import multer from "multer";
 import { authMiddleware } from "../middleware/authMiddleware.js";
-import { 
-    crearPostulacion, 
+import { bloqueoTemporal } from "../middleware/bloqueoTemporal.js";
+import {
+    crearPostulacion,
     obtenerPostulacionesPorVacante,
     actualizarEstadoPostulacion,
     actualizarAnclajePostulacion,
-    obtenerDetallePostulacionesAdmin,
-    obtenerTodasLasPostulacionesAdmin,
     // --- NUEVAS IMPORTACIONES ---
     obtenerPostulacionesPorEmpresa, 
     calificarPostulacion 
@@ -30,13 +29,15 @@ const upload = multer({
 
 // --- RUTAS DE POSTULACIÓN (EGRESADOS Y EMPRESAS) ---
 
-router.get("/vacante/:vacanteId", obtenerPostulacionesPorVacante);
+// Sólo la empresa dueña de la vacante (token + verificación en el controlador)
+router.get("/vacante/:vacanteId", authMiddleware, obtenerPostulacionesPorVacante);
 router.post("/enviar", crearPostulacion);
 
 // --- RUTAS DE GESTIÓN (DASHBOARD EMPRESA) ---
 
 // Obtiene todas las postulaciones de una empresa específica (Para la nueva tabla global)
-router.get("/empresa/:empresaId", obtenerPostulacionesPorEmpresa); 
+// Sólo la propia empresa (token + verificación en el controlador)
+router.get("/empresa/:empresaId", authMiddleware, obtenerPostulacionesPorEmpresa);
 
 // Actualizar el estado de una postulación
 // Sólo la empresa dueña de la vacante (token + verificación en el controlador)
@@ -49,7 +50,9 @@ router.put("/:id/anclaje", authMiddleware, actualizarAnclajePostulacion);
 router.put("/calificar/:id", authMiddleware, calificarPostulacion);
 
 // --- PERFIL ADMINISTRADOR (UdeC) ---
-router.get("/admin/detalle-completo/:vacanteId", obtenerDetallePostulacionesAdmin);
-router.get("/admin/todas", obtenerTodasLasPostulacionesAdmin);
+// obtenerDetallePostulacionesAdmin y obtenerTodasLasPostulacionesAdmin, hasta que
+// exista el rol de administrador
+router.get("/admin/detalle-completo/:vacanteId", bloqueoTemporal);
+router.get("/admin/todas", bloqueoTemporal);
 
 export default router;

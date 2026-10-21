@@ -3,7 +3,6 @@ import {
     obtenerNotificacionesEgresado, 
     obtenerNotificacionesEmpresa,
     marcarNotificacionLeida,
-    debugNotificaciones,
     eliminarNotificacion // <--- Asegúrate de importarla
 } from '../controllers/notificacionController.js';
 
@@ -14,8 +13,6 @@ router.get("/empresa/:empresaId", obtenerNotificacionesEmpresa);
 router.put('/:id/leer', marcarNotificacionLeida);
 
 // --- ESTA ES LA RUTA QUE TE FALTA ---
-router.delete('/:id', eliminarNotificacion); 
-// Importa debugNotificaciones arriba, y luego añade:
-router.get("/debug/todas", debugNotificaciones);
+router.delete('/:id', eliminarNotificacion);
 
 export default router;

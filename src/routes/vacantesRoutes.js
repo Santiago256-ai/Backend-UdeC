@@ -1,11 +1,10 @@
 import express from "express";
-import { 
-    crearVacante, 
-    listarVacantes, 
-    eliminarVacante, 
+import { bloqueoTemporal } from "../middleware/bloqueoTemporal.js";
+import {
+    crearVacante,
+    listarVacantes,
+    eliminarVacante,
     listarVacantesPorEmpresa,
-    listarTodasLasVacantesAdmin,
-    obtenerEstadisticasAdmin,
     actualizarVacante,
     reactivarVacante,
     eliminarDefinitivamente,
@@ -25,8 +24,10 @@ router.post("/", crearVacante);
 router.get("/", listarVacantes); 
 
 // --- RUTAS DE ADMINISTRACIÓN GLOBAL ---
-router.get("/admin/todas", listarTodasLasVacantesAdmin);
-router.get("/stats", obtenerEstadisticasAdmin);
+// listarTodasLasVacantesAdmin y obtenerEstadisticasAdmin, hasta que exista el rol
+// de administrador
+router.get("/admin/todas", bloqueoTemporal);
+router.get("/stats", bloqueoTemporal);
 
 
 // ==========================================

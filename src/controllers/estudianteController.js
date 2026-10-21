@@ -2,7 +2,7 @@ import prisma from '../prismaClient.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'mi_clave_secreta_debes_cambiarla';
+import { JWT_SECRET } from '../config/jwtSecret.js';
 
 // ==========================================
 // Registro de Egresado (CORREGIDO)

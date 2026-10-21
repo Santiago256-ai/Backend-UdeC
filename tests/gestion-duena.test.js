@@ -7,7 +7,6 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 
 const { db, correo } = vi.hoisted(() => {
-  process.env.JWT_SECRET = 'clave-solo-para-pruebas';
   return {
     db: {
       postulacion: { findUnique: vi.fn(), update: vi.fn() },

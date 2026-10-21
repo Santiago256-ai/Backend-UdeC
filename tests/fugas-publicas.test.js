@@ -7,7 +7,6 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 
 const db = vi.hoisted(() => {
-  process.env.JWT_SECRET = 'clave-solo-para-pruebas';
   return {
     vacante: { findMany: vi.fn() },
     postulacion: { findMany: vi.fn() },

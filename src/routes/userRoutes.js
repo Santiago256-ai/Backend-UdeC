@@ -1,12 +1,13 @@
 // backend/routes/userRoutes.js
 import express from "express";
-import { obtenerTodosLosEgresados, actualizarEgresadoAdmin } from '../controllers/userController.js';
 import { bloqueoTemporal } from '../middleware/bloqueoTemporal.js';
 
 const router = express.Router();
 
-router.get('/admin/todos', obtenerTodosLosEgresados);
-router.delete('/:id', bloqueoTemporal); // eliminarEgresado, hasta que exista el rol de administrador
-router.put('/:id', actualizarEgresadoAdmin);
+// obtenerTodosLosEgresados, eliminarEgresado y actualizarEgresadoAdmin, hasta que
+// exista el rol de administrador (sólo las usa el panel de admin)
+router.get('/admin/todos', bloqueoTemporal);
+router.delete('/:id', bloqueoTemporal);
+router.put('/:id', bloqueoTemporal);
 
 export default router;

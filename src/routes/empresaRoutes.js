@@ -4,10 +4,8 @@ import { bloqueoTemporal } from "../middleware/bloqueoTemporal.js";
 import {
     crearEmpresa,
     listarEmpresas,
-    obtenerEmpresasParaAdmin,
     obtenerPerfilEmpresa, // 👈 Agregar
-    actualizarEmpresa,    // 👈 Agregar
-    actualizarEmpresaAdmin
+    actualizarEmpresa     // 👈 Agregar
 } from "../controllers/empresaController.js";
 
 const router = Router();
@@ -20,10 +18,11 @@ router.get("/", listarEmpresas);
 router.get("/:id", authMiddleware, obtenerPerfilEmpresa); 
 router.put("/:id", authMiddleware, actualizarEmpresa);
 
-router.get("/admin/todas", obtenerEmpresasParaAdmin);
-// eliminarEmpresaAdmin y actualizarEstadoEmpresaAdmin, hasta que exista el rol de administrador
+// obtenerEmpresasParaAdmin, eliminarEmpresaAdmin, actualizarEstadoEmpresaAdmin y
+// actualizarEmpresaAdmin, hasta que exista el rol de administrador
+router.get("/admin/todas", bloqueoTemporal);
 router.delete("/admin/:id", bloqueoTemporal);
 router.put('/admin/estado/:id', bloqueoTemporal);
-router.put('/admin/:id', actualizarEmpresaAdmin);
+router.put('/admin/:id', bloqueoTemporal);
 
 export default router;

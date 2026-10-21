@@ -1,5 +1,6 @@
-// Contención (2026-10): borrar cuentas y activarlas o desactivarlas queda
-// deshabilitado hasta que exista el rol de administrador. Las funciones de los
+// Contención (2026-10): las rutas del panel de administración (listados,
+// estadísticas, ediciones, borrados y activar/desactivar cuentas) quedan
+// deshabilitadas hasta que exista el rol de administrador. Las funciones de los
 // controladores siguen ahí; para restaurarlas basta con volver a montarlas en
 // la ruta, ya detrás de la verificación de rol.
 export const bloqueoTemporal = (req, res) => {

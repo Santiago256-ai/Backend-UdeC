@@ -1,6 +1,11 @@
 // Contención de las rutas de administración (2026-10).
 // Prisma está simulado: no hay base de datos ni red. Se montan sólo las rutas
 // de usuarios y empresas sobre un Express de prueba (src/server.js no se carga).
+//
+// Desde la Contención 2 los listados y las ediciones del panel responden 403 en
+// las rutas reales (tests/admin-lecturas.test.js). Sus controladores siguen en el
+// código para volver a montarlos detrás del rol de administrador, así que aquí se
+// prueban montados directamente: lo que devuelven y lo que dejan escribir.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
@@ -13,11 +18,20 @@ vi.mock('@prisma/client', () => ({ PrismaClient: vi.fn(() => db) }));
 
 const { default: userRoutes } = await import('../src/routes/userRoutes.js');
 const { default: empresaRoutes } = await import('../src/routes/empresaRoutes.js');
+const { obtenerTodosLosEgresados, actualizarEgresadoAdmin } = await import('../src/controllers/userController.js');
+const { obtenerEmpresasParaAdmin, actualizarEmpresaAdmin } = await import('../src/controllers/empresaController.js');
 
 const app = express();
 app.use(express.json());
-app.use('/api/usuarios', userRoutes);
-app.use('/api/empresas', empresaRoutes);
+// Controladores del panel montados sin la ruta real (que hoy responde 403).
+app.get('/api/usuarios/admin/todos', obtenerTodosLosEgresados);
+app.put('/api/usuarios/:id', actualizarEgresadoAdmin);
+app.get('/api/empresas/admin/todas', obtenerEmpresasParaAdmin);
+app.put('/api/empresas/admin/:id', actualizarEmpresaAdmin);
+const appRutas = express();
+appRutas.use(express.json());
+appRutas.use('/api/usuarios', userRoutes);
+appRutas.use('/api/empresas', empresaRoutes);
 
 const PROHIBIDOS = ['password', 'resetToken', 'resetTokenExpiry', 'firebaseUid'];
 const FINANCIEROS = ['annualRevenue', 'totalAssets', 'equity'];
@@ -45,7 +59,7 @@ beforeEach(() => {
 
 const sinCampos = (obj, campos) => campos.filter((c) => c in obj);
 
-describe('GET /api/usuarios/admin/todos', () => {
+describe('obtenerTodosLosEgresados (controlador de GET /api/usuarios/admin/todos)', () => {
   it('pide y devuelve sólo los campos del panel', async () => {
     const res = await request(app).get('/api/usuarios/admin/todos');
     expect(res.status).toBe(200);
@@ -59,7 +73,7 @@ describe('GET /api/usuarios/admin/todos', () => {
   });
 });
 
-describe('PUT /api/usuarios/:id', () => {
+describe('actualizarEgresadoAdmin (controlador de PUT /api/usuarios/:id)', () => {
   it('ignora correo, password, resetToken, resetTokenExpiry y firebaseUid', async () => {
     const res = await request(app).put('/api/usuarios/7').send({
       nombres: 'Laura M.', apellidos: 'Gómez', celular: '3111111111', facultad: 'Ingeniería', programa: 'Sistemas',
@@ -95,7 +109,7 @@ describe('PUT /api/usuarios/:id', () => {
 
 describe('DELETE /api/usuarios/:id', () => {
   it('responde 403 y no borra', async () => {
-    const res = await request(app).delete('/api/usuarios/7');
+    const res = await request(appRutas).delete('/api/usuarios/7');
     expect(res.status).toBe(403);
     expect(db.egresado.delete).not.toHaveBeenCalled();
   });
@@ -103,13 +117,13 @@ describe('DELETE /api/usuarios/:id', () => {
 
 describe('DELETE /api/empresas/admin/:id', () => {
   it('responde 403 y no borra', async () => {
-    const res = await request(app).delete('/api/empresas/admin/7');
+    const res = await request(appRutas).delete('/api/empresas/admin/7');
     expect(res.status).toBe(403);
     expect(db.empresa.delete).not.toHaveBeenCalled();
   });
 });
 
-describe('GET /api/empresas/admin/todas', () => {
+describe('obtenerEmpresasParaAdmin (controlador de GET /api/empresas/admin/todas)', () => {
   it('pide sólo los campos de la lista y del modal, sin secretos ni datos financieros', async () => {
     const res = await request(app).get('/api/empresas/admin/todas');
     expect(res.status).toBe(200);
@@ -121,7 +135,7 @@ describe('GET /api/empresas/admin/todas', () => {
   });
 });
 
-describe('PUT /api/empresas/admin/:id', () => {
+describe('actualizarEmpresaAdmin (controlador de PUT /api/empresas/admin/:id)', () => {
   it('sólo guarda los campos editables del modal; email y secretos quedan fuera', async () => {
     const res = await request(app).put('/api/empresas/admin/7').send({
       nombre: 'Agro Andes SAS', nit: '901', phones: '602', contactName: 'Ana', address: 'Calle 2', city: 'Girardot',
@@ -145,7 +159,7 @@ describe('PUT /api/empresas/admin/:id', () => {
 
 describe('PUT /api/empresas/admin/estado/:id', () => {
   it('responde 403 y no cambia el estado', async () => {
-    const res = await request(app).put('/api/empresas/admin/estado/7').send({ estado: 'INACTIVO' });
+    const res = await request(appRutas).put('/api/empresas/admin/estado/7').send({ estado: 'INACTIVO' });
     expect(res.status).toBe(403);
     expect(db.empresa.update).not.toHaveBeenCalled();
   });

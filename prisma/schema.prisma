@@ -231,3 +231,17 @@ model Notificacion {
   empresaId    Int?
   empresa      Empresa?     @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 }
+
+// Cuentas del panel de administración. Tabla aparte de Egresado y Empresa: se
+// entra por POST /api/auth/admin/login con nombre de usuario, no con correo.
+// Las cuentas se crean y se restablecen con scripts/admin.mjs.
+model Administrador {
+  id           Int       @id @default(autoincrement())
+  usuario      String    @unique
+  password     String
+  nombre       String?
+  activo       Boolean   @default(true)
+  ultimoAcceso DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}

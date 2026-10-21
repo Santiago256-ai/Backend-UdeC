@@ -62,7 +62,15 @@ export const login = async (req, res) => {
     const identificador = correo.toLowerCase();
 
     // 1. Buscar en Egresado
-    let egresado = await prisma.egresado.findUnique({ where: { correo: identificador } });
+    // Sólo lo que hace falta para validar y lo que lee el frontend de
+    // localStorage['usuario']; nunca resetToken ni firebaseUid.
+    let egresado = await prisma.egresado.findUnique({
+        where: { correo: identificador },
+        select: {
+            id: true, nombres: true, apellidos: true, correo: true, celular: true, programa: true,
+            estado: true, password: true,
+        }
+    });
     
     if (egresado) {
         // 🟢 NUEVO: VALIDACIÓN DE ESTADO INACTIVO
@@ -89,14 +97,24 @@ export const login = async (req, res) => {
         return res.json({ 
             success: true,
             token, 
-            tipo: "egresado", 
-            usuario: egresado 
+            tipo: "egresado",
+            usuario: {
+                id: egresado.id,
+                nombres: egresado.nombres,
+                apellidos: egresado.apellidos,
+                correo: egresado.correo,
+                celular: egresado.celular,
+                programa: egresado.programa
+            }
         });
     }
 
     // 2. Buscar en Empresa usando el identificador normalizado
 // 2. Buscar en Empresa usando el identificador normalizado
-    const empresa = await prisma.empresa.findUnique({ where: { email: identificador } });
+    const empresa = await prisma.empresa.findUnique({
+        where: { email: identificador },
+        select: { id: true, nombre: true, email: true, estado: true, password: true }
+    });
 
     if (empresa) {
         // 🛑 ¡AQUÍ ESTÁ EL MURO DE SEGURIDAD! 🛑

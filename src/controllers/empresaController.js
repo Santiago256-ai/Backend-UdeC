@@ -54,6 +54,18 @@ const CAMPOS_EMPRESA_PERFIL_EDITABLES = [
     'foundationYear', 'employees', 'mainClients', 'modalidad', 'descripcion', 'beneficios',
     'sitioWeb', 'linkedin', 'visibilidad',
 ];
+// Lo que oculta cada interruptor de visibilidad de PerfilEmpresa a quien no es la
+// dueña (antes sólo lo ocultaba VerPerfilEmpresa en el navegador). economicSector
+// no: el encabezado de VerPerfilEmpresa lo muestra siempre.
+const CAMPOS_POR_SECCION_VISIBLE = {
+    sobreNosotros: ['descripcion'],
+    detallesEmpresa: ['companyType', 'employees', 'modalidad', 'foundationYear'],
+    beneficios: ['beneficios'],
+    ubicacion: ['address', 'city', 'department'],
+    presenciaDigital: ['sitioWeb', 'linkedin'],
+    contacto: ['contactName', 'phones'],
+    infoComercial: ['mainClients'],
+};
 
 // Crear una nueva empresa
 export const crearEmpresa = async (req, res) => {
@@ -238,6 +250,25 @@ export const obtenerPerfilEmpresa = async (req, res) => {
 
         if (!empresa) {
             return res.status(404).json({ error: "Empresa no encontrada" });
+        }
+
+        // 🛡️ Quien no es la dueña (rol empresa y mismo id) no recibe las secciones
+        // ocultas, y de cada postulación sólo ve su propio egresadoId: las demás van
+        // en null para conservar el conteo de inscritos.
+        const esDuena = req.user?.rol === "empresa" && req.user.id === empresa.id;
+        if (!esDuena) {
+            for (const [seccion, campos] of Object.entries(CAMPOS_POR_SECCION_VISIBLE)) {
+                if (empresa.visibilidad?.[seccion] === false) {
+                    for (const campo of campos) delete empresa[campo];
+                }
+            }
+            const propioId = req.user?.rol === "egresado" ? req.user.id : null;
+            for (const vacante of empresa.vacantes) {
+                vacante.postulaciones = vacante.postulaciones.map((p) => ({
+                    id: p.id,
+                    egresadoId: p.egresadoId === propioId ? p.egresadoId : null,
+                }));
+            }
         }
 
         res.json(empresa);

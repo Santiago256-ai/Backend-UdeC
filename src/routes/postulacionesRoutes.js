@@ -2,6 +2,7 @@ import express from "express";
 import multer from "multer";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { bloqueoTemporal } from "../middleware/bloqueoTemporal.js";
+import { requireRol } from "../middleware/requireRol.js";
 import {
     crearPostulacion,
     obtenerPostulacionesPorVacante,
@@ -31,7 +32,8 @@ const upload = multer({
 
 // Sólo la empresa dueña de la vacante (token + verificación en el controlador)
 router.get("/vacante/:vacanteId", authMiddleware, obtenerPostulacionesPorVacante);
-router.post("/enviar", crearPostulacion);
+// Sólo una sesión de egresado, que se postula a sí misma (el egresado sale del token)
+router.post("/enviar", authMiddleware, requireRol("egresado"), crearPostulacion);
 
 // --- RUTAS DE GESTIÓN (DASHBOARD EMPRESA) ---
 

@@ -160,14 +160,18 @@ export const obtenerMiCV = async (req, res) => {
 export const obtenerPerfilBase = async (req, res) => {
     try {
         const id = req.user.id; 
+        // Sólo lo que muestra PerfilEgresado.jsx; nunca password, resetToken ni firebaseUid
         const egresado = await prisma.egresado.findUnique({
-            where: { id: parseInt(id) }
+            where: { id: parseInt(id) },
+            select: {
+                id: true, nombres: true, apellidos: true, correo: true,
+                celular: true, facultad: true, programa: true,
+            }
         });
-        
+
         if (!egresado) return res.status(404).json({ error: "No encontrado" });
 
-        const { password, ...datosPublicos } = egresado;
-        res.json(datosPublicos); 
+        res.json(egresado);
     } catch (error) {
         res.status(500).json({ error: "Error al obtener perfil" });
     }
@@ -187,7 +191,8 @@ export const actualizarEgresado = async (req, res) => {
         const { nombres, apellidos, celular } = req.body;
 
         const egresadoExistente = await prisma.egresado.findUnique({
-            where: { id: egresadoId }
+            where: { id: egresadoId },
+            select: { nombres: true, apellidos: true, celular: true }
         });
 
         if (!egresadoExistente) {
@@ -199,15 +204,18 @@ export const actualizarEgresado = async (req, res) => {
             data: {
                 nombres: nombres || egresadoExistente.nombres,
                 apellidos: apellidos || egresadoExistente.apellidos,
-                celular: celular || egresadoExistente.celular, 
+                celular: celular || egresadoExistente.celular,
+            },
+            // PerfilEgresado.jsx mezcla esta respuesta en localStorage['usuario']:
+            // sólo lo que se lee de ahí, nunca password, resetToken ni firebaseUid
+            select: {
+                id: true, nombres: true, apellidos: true, correo: true, celular: true, programa: true,
             },
         });
 
-        const { password, ...datosSeguros } = egresadoActualizado;
-        
         res.status(200).json({
             message: "Datos de registro actualizados correctamente",
-            egresado: datosSeguros
+            egresado: egresadoActualizado
         });
 
     } catch (error) {

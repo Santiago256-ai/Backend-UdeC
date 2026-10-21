@@ -9,8 +9,13 @@ import {
     actualizarEgresado    // 👈 Nueva importación: Actualiza datos de registro
 } from "../controllers/estudianteController.js"; 
 import { authMiddleware } from "../middleware/authMiddleware.js";
+import { requireRol } from "../middleware/requireRol.js";
 
 const router = Router();
+
+// Las rutas que toman el egresado de req.user.id sólo aceptan sesiones de egresado:
+// una empresa con el mismo id numérico actuaría sobre ese egresado.
+const soloEgresado = [authMiddleware, requireRol("egresado")];
 
 // --- RUTAS DE AUTENTICACIÓN ---
 router.post("/registro", crearEstudiante);
@@ -20,37 +25,22 @@ router.post("/login", loginEstudiante);
 // Estas rutas sirven para el componente PerfilEgresado.jsx
 
 // 1. Obtener datos (Nombre, Apellidos, Facultad, Programa, Celular)
-router.get("/perfil", authMiddleware, obtenerPerfilBase);
+router.get("/perfil", soloEgresado, obtenerPerfilBase);
 
 // 2. Actualizar esos mismos datos
-router.put("/actualizar", authMiddleware, actualizarEgresado);
+router.put("/actualizar", soloEgresado, actualizarEgresado);
 
 
 // --- RUTAS DE LA HOJA DE VIDA DIGITAL ---
 // Estas rutas son exclusivamente para la Hoja de Vida (CV)
-router.get("/mi-cv", authMiddleware, obtenerMiCV);
-router.post("/guardar-cv", authMiddleware, guardarCV);
+router.get("/mi-cv", soloEgresado, obtenerMiCV);
+router.post("/guardar-cv", soloEgresado, guardarCV);
 
 
 // --- RUTAS DE POSTULACIÓN ---
 
-// 1. Ver mis postulaciones
-router.get("/usuario/:usuarioId", authMiddleware, async (req, res) => {
-    try {
-        const uId = parseInt(req.params.usuarioId);
-        const postulaciones = await prisma.postulacion.findMany({
-            where: { egresadoId: uId },
-            include: { vacante: true },
-        });
-        res.json(postulaciones);
-    } catch (error) {
-        res.status(500).json({ error: "Error al obtener postulaciones" });
-    }
-});
-
-// 2. Postularse a una vacante
-// 2. Postularse a una vacante (VERSIÓN ACTUALIZADA CON NOTIFICACIONES)
-router.post("/:vacanteId/postular", authMiddleware, async (req, res) => {
+// Postularse a una vacante (con notificación a la empresa)
+router.post("/:vacanteId/postular", soloEgresado, async (req, res) => {
     try {
         const { telefono } = req.body;
         const vId = parseInt(req.params.vacanteId);

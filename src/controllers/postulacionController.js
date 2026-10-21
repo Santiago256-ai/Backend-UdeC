@@ -98,16 +98,38 @@ export const crearPostulacion = async (req, res) => {
 };
 
 // ✅ OBTENER POSTULACIONES POR ID DE VACANTE (CORREGIDO SEGÚN SCHEMA.PRISMA)
+// 🛡️ Postulantes de una vacante: sólo una sesión de empresa y sólo sobre sus propias
+// vacantes (también las eliminadas: las lista VacantesEliminadas). Si no existe o
+// es de otra empresa responde el mismo 404.
 export const obtenerPostulacionesPorVacante = async (req, res) => {
     try {
+        if (req.user?.rol !== "empresa") {
+            return res.status(403).json({ error: "Sólo la empresa dueña de la vacante puede ver sus postulaciones." });
+        }
         const vacanteId = parseInt(req.params.vacanteId);
         if (isNaN(vacanteId)) return res.status(400).json({ error: "ID inválido." });
 
+        const vacante = await prisma.vacante.findUnique({
+            where: { id: vacanteId },
+            select: { empresaId: true }
+        });
+        if (!vacante || vacante.empresaId !== req.user.id) {
+            return res.status(404).json({ error: "Vacante no encontrada." });
+        }
+
         const postulaciones = await prisma.postulacion.findMany({
             where: { vacanteId },
-            include: {
-                // Sólo lo que leen la tabla de postulantes, el chat y la hoja de vida
-                // (VerCV). Nunca password, resetToken, resetTokenExpiry ni firebaseUid.
+            // Sólo lo que leen la tabla de postulantes (ListaPostulacionesTable y
+            // VacantesEliminadas), el chat (ChatWidget) y la hoja de vida (VerCV).
+            // Sin teléfono, calificación ni comentario; nunca password, resetToken,
+            // resetTokenExpiry ni firebaseUid.
+            select: {
+                id: true,
+                estado: true,
+                anclado: true,
+                fecha: true,
+                vacanteId: true,
+                egresadoId: true,
                 egresado: {
                     select: {
                         id: true,
@@ -115,29 +137,30 @@ export const obtenerPostulacionesPorVacante = async (req, res) => {
                         apellidos: true,
                         correo: true,
                         cv: {
-                            include: {
+                            select: {
+                                celular: true,
+                                direccion: true,
+                                descripcion: true,
+                                habilidades: true,
                                 // Nombres exactos de las relaciones en tu PerfilCV (schema.prisma)
-                                educacion: true,   
-                                experiencia: true, 
+                                educacion: true,
+                                experiencia: true,
                                 aptitudes: true,
                                 idiomas: true,
                                 referencias: true
                             }
                         }
                     }
-                } 
+                }
             },
             orderBy: { id: "desc" },
         });
-    
+
         res.json(postulaciones);
     } catch (error) {
         // Imprime el error específico para depurar en Vercel
         console.error("❌ Error de Prisma al obtener perfil completo:", error.message);
-        res.status(500).json({ 
-            error: "No se pudo obtener la información completa del perfil.",
-            detalle: error.message 
-        });
+        res.status(500).json({ error: "No se pudo obtener la información completa del perfil." });
     }
 }
 
@@ -290,12 +313,20 @@ export const actualizarAnclajePostulacion = async (req, res) => {
 };
 
 // 🟢 NUEVO: Obtener todas las postulaciones de una empresa (Para TotalPostulaciones.jsx)
+// 🛡️ Sólo la propia empresa (sesión de empresa con el mismo id); otra empresa
+// recibe 404.
 export const obtenerPostulacionesPorEmpresa = async (req, res) => {
     try {
+        if (req.user?.rol !== "empresa") {
+            return res.status(403).json({ error: "Sólo la empresa puede ver sus postulaciones." });
+        }
         const empresaId = parseInt(req.params.empresaId);
 
         if (isNaN(empresaId)) {
             return res.status(400).json({ error: "ID de empresa no válido." });
+        }
+        if (empresaId !== req.user.id) {
+            return res.status(404).json({ error: "Empresa no encontrada." });
         }
 
         const postulaciones = await prisma.postulacion.findMany({
@@ -304,12 +335,19 @@ export const obtenerPostulacionesPorEmpresa = async (req, res) => {
                     empresaId: empresaId
                 }
             },
-            include: {
+            // Sólo lo que lee TotalPostulaciones (que muestra y edita la calificación
+            // y el comentario). Sin teléfono ni correo.
+            select: {
+                id: true,
+                estado: true,
+                fecha: true,
+                fechaActualizacion: true,
+                calificacionAdmin: true,
+                comentarioAdmin: true,
                 egresado: {
                     select: {
                         nombres: true,
-                        apellidos: true,
-                        correo: true
+                        apellidos: true
                     }
                 },
                 vacante: {

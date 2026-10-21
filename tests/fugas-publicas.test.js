@@ -111,22 +111,8 @@ describe('GET /api/vacantes (feed público de egresados)', () => {
   });
 });
 
-describe('GET /api/postulaciones/vacante/:vacanteId', () => {
-  it('el egresado sale sin password, resetToken, resetTokenExpiry ni firebaseUid', async () => {
-    const res = await request(app).get('/api/postulaciones/vacante/5');
-    expect(res.status).toBe(200);
-    expect(sinCampos(res.body[0].egresado, PROHIBIDOS)).toEqual([]);
-  });
-
-  it('mantiene lo que leen la tabla, el chat y VerCV', async () => {
-    const res = await request(app).get('/api/postulaciones/vacante/5');
-    const p = res.body[0];
-    expect(p).toMatchObject({ id: 11, estado: 'PENDIENTE', anclado: false, vacanteId: 5, egresadoId: 7 });
-    expect(p.egresado).toMatchObject({ id: 7, nombres: 'Laura', apellidos: 'Gómez', correo: 'laura@ejemplo.com' });
-    expect(p.egresado.cv.educacion).toHaveLength(1);
-    expect(p.egresado.cv).toHaveProperty('experiencia');
-  });
-});
+// GET /api/postulaciones/vacante/:vacanteId ya no es pública (Contención 2): sus
+// pruebas, con token de la empresa dueña, están en tests/postulaciones-vacante.test.js.
 
 describe('GET /api/empresas/:id', () => {
   const token = jwt.sign({ id: 99, rol: 'egresado' }, process.env.JWT_SECRET);

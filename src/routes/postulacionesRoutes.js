@@ -29,13 +29,15 @@ const upload = multer({
 
 // --- RUTAS DE POSTULACIÓN (EGRESADOS Y EMPRESAS) ---
 
-router.get("/vacante/:vacanteId", obtenerPostulacionesPorVacante);
+// Sólo la empresa dueña de la vacante (token + verificación en el controlador)
+router.get("/vacante/:vacanteId", authMiddleware, obtenerPostulacionesPorVacante);
 router.post("/enviar", crearPostulacion);
 
 // --- RUTAS DE GESTIÓN (DASHBOARD EMPRESA) ---
 
 // Obtiene todas las postulaciones de una empresa específica (Para la nueva tabla global)
-router.get("/empresa/:empresaId", obtenerPostulacionesPorEmpresa); 
+// Sólo la propia empresa (token + verificación en el controlador)
+router.get("/empresa/:empresaId", authMiddleware, obtenerPostulacionesPorEmpresa);
 
 // Actualizar el estado de una postulación
 // Sólo la empresa dueña de la vacante (token + verificación en el controlador)

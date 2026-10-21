@@ -8,7 +8,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import { firmar, EMPRESA_DUENA, EGRESADO_MISMO_ID, PROHIBIDOS, sinCampos, egresadoCompleto } from './apoyo/simulador.js';
+import { firmar, proyectar, EMPRESA_DUENA, EGRESADO_MISMO_ID, PROHIBIDOS, sinCampos, egresadoCompleto } from './apoyo/simulador.js';
 
 const db = vi.hoisted(() => ({
   egresado: { findUnique: vi.fn(), update: vi.fn() },
@@ -52,7 +52,8 @@ const llamar = (metodo, ruta, cuerpo, token) => {
 beforeEach(() => {
   vi.clearAllMocks();
   const egresado = egresadoCompleto(3);
-  db.egresado.findUnique.mockResolvedValue(egresado);
+  // Como Prisma: devuelve sólo lo que pide el select (sin select, la fila entera).
+  db.egresado.findUnique.mockImplementation(async (consulta) => proyectar(egresado, consulta));
   db.egresado.update.mockImplementation(async ({ data }) => ({ ...egresado, ...data }));
   db.perfilCV.findUnique.mockResolvedValue({ ...egresado.cv, egresadoId: 3 });
   db.perfilCV.upsert.mockResolvedValue({ ...egresado.cv, egresadoId: 3 });
@@ -91,6 +92,15 @@ describe('el propio egresado sigue usando sus rutas igual', () => {
     expect(db.egresado.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 3 } }));
     expect(res.body).toMatchObject({ id: 3, nombres: 'Laura', apellidos: 'Gómez', celular: '3000000000' });
     expect(res.body).not.toHaveProperty('password');
+  });
+
+  it('GET /api/estudiantes/perfil trae lo que lee PerfilEgresado.jsx y ningún secreto', async () => {
+    const res = await llamar('get', '/api/estudiantes/perfil', null, EGRESADO_MISMO_ID());
+    expect(sinCampos(res.body, PROHIBIDOS)).toEqual([]);
+    expect(res.body).toMatchObject({
+      nombres: 'Laura', apellidos: 'Gómez', correo: 'laura@ejemplo.com', celular: '3000000000',
+      facultad: 'Ingeniería', programa: 'Sistemas',
+    });
   });
 
   it('PUT /api/estudiantes/actualizar guarda sobre su propio registro', async () => {

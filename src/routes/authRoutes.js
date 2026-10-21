@@ -9,13 +9,17 @@ import {
     requestPasswordReset, // Solicitar el correo
     resetPassword         // Cambiar la clave final
 } from "../controllers/authController.js";
+import { loginAdmin } from "../controllers/adminAuthController.js";
 
 const router = express.Router();
 
 // --- RUTAS DE ACCESO ---
 router.post("/register", register);
 router.post("/login", login);
-router.post("/social-login", socialLogin); 
+router.post("/social-login", socialLogin);
+
+// Panel de administración: sólo la tabla Administrador, token de 2 h con aud "admin".
+router.post("/admin/login", loginAdmin);
 
 // --- RUTAS DE RECUPERACIÓN (SISTEMA NATIVO BD) ---
 // 1. Para cuando el usuario pone su correo en "¿Olvidaste tu contraseña?"

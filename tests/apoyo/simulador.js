@@ -31,6 +31,11 @@ export const firmar = (payload) => `Bearer ${jwt.sign(payload, process.env.JWT_S
 export const EMPRESA_DUENA = () => firmar({ id: 3, rol: 'empresa' });
 export const OTRA_EMPRESA = () => firmar({ id: 4, rol: 'empresa' });
 export const EGRESADO_MISMO_ID = () => firmar({ id: 3, rol: 'egresado' }); // mismo id numérico que la empresa
+// Token de administrador como lo emite POST /api/auth/admin/login: sub + aud, sin id.
+export const firmarAdmin = (payload = {}, opciones = {}) => `Bearer ${jwt.sign(
+  { rol: 'admin', ...payload }, process.env.JWT_SECRET,
+  { subject: '1', audience: 'admin', expiresIn: '2h', ...opciones })}`;
+export const TOKEN_ADMIN = () => firmarAdmin();
 
 // Egresado completo, como lo guarda la base (con secretos y CV).
 export const egresadoCompleto = (id = 7) => ({

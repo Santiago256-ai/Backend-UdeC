@@ -36,8 +36,10 @@ const verificarEmpresaDuena = async (req, res) => {
 // 🟢 Crear una nueva postulación (CON VALIDACIONES DE LÍMITES)
 export const crearPostulacion = async (req, res) => {
   try {
-    const { telefono, vacanteId, egresadoId } = req.body;
-    const uId = parseInt(egresadoId || req.user?.id); 
+    // El egresado sale del token (la ruta exige sesión de egresado); un egresadoId
+    // en el cuerpo se ignora para que nadie se postule en nombre de otro.
+    const { telefono, vacanteId } = req.body;
+    const uId = parseInt(req.user.id);
     const vId = parseInt(vacanteId);
 
     if (isNaN(uId) || isNaN(vId)) {

@@ -191,7 +191,8 @@ export const actualizarEgresado = async (req, res) => {
         const { nombres, apellidos, celular } = req.body;
 
         const egresadoExistente = await prisma.egresado.findUnique({
-            where: { id: egresadoId }
+            where: { id: egresadoId },
+            select: { nombres: true, apellidos: true, celular: true }
         });
 
         if (!egresadoExistente) {
@@ -203,15 +204,18 @@ export const actualizarEgresado = async (req, res) => {
             data: {
                 nombres: nombres || egresadoExistente.nombres,
                 apellidos: apellidos || egresadoExistente.apellidos,
-                celular: celular || egresadoExistente.celular, 
+                celular: celular || egresadoExistente.celular,
+            },
+            // PerfilEgresado.jsx mezcla esta respuesta en localStorage['usuario']:
+            // sólo lo que se lee de ahí, nunca password, resetToken ni firebaseUid
+            select: {
+                id: true, nombres: true, apellidos: true, correo: true, celular: true, programa: true,
             },
         });
 
-        const { password, ...datosSeguros } = egresadoActualizado;
-        
         res.status(200).json({
             message: "Datos de registro actualizados correctamente",
-            egresado: datosSeguros
+            egresado: egresadoActualizado
         });
 
     } catch (error) {

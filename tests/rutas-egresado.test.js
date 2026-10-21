@@ -54,7 +54,7 @@ beforeEach(() => {
   const egresado = egresadoCompleto(3);
   // Como Prisma: devuelve sólo lo que pide el select (sin select, la fila entera).
   db.egresado.findUnique.mockImplementation(async (consulta) => proyectar(egresado, consulta));
-  db.egresado.update.mockImplementation(async ({ data }) => ({ ...egresado, ...data }));
+  db.egresado.update.mockImplementation(async ({ data, ...consulta }) => proyectar({ ...egresado, ...data }, consulta));
   db.perfilCV.findUnique.mockResolvedValue({ ...egresado.cv, egresadoId: 3 });
   db.perfilCV.upsert.mockResolvedValue({ ...egresado.cv, egresadoId: 3 });
   db.vacante.findUnique.mockResolvedValue({ titulo: 'Analista', estado: 'ABIERTA', empresaId: 4 });
@@ -109,6 +109,15 @@ describe('el propio egresado sigue usando sus rutas igual', () => {
     expect(db.egresado.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 3 } }));
     expect(res.body.egresado).toMatchObject({ id: 3, nombres: 'Lau' });
     expect(res.body.egresado).not.toHaveProperty('password');
+  });
+
+  // PerfilEgresado.jsx mezcla res.data.egresado en localStorage['usuario']
+  it('PUT /api/estudiantes/actualizar responde lo que se lee de localStorage y ningún secreto', async () => {
+    const res = await llamar('put', '/api/estudiantes/actualizar', { celular: '3111111111' }, EGRESADO_MISMO_ID());
+    expect(sinCampos(res.body.egresado, PROHIBIDOS)).toEqual([]);
+    expect(res.body.egresado).toEqual({
+      id: 3, nombres: 'Laura', apellidos: 'Gómez', correo: 'laura@ejemplo.com', celular: '3111111111', programa: 'Sistemas',
+    });
   });
 
   it('GET /api/estudiantes/mi-cv lee su propia hoja de vida', async () => {

@@ -14,7 +14,7 @@ const db = vi.hoisted(() => ({
   egresado: { findUnique: vi.fn(), update: vi.fn() },
   perfilCV: { findUnique: vi.fn(), upsert: vi.fn() },
   vacante: { findUnique: vi.fn() },
-  postulacion: { findUnique: vi.fn(), create: vi.fn() },
+  postulacion: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn() },
   notificacion: { create: vi.fn() },
 }));
 vi.mock('@prisma/client', () => ({ PrismaClient: vi.fn(() => db) }));
@@ -59,6 +59,7 @@ beforeEach(() => {
   db.perfilCV.upsert.mockResolvedValue({ ...egresado.cv, egresadoId: 3 });
   db.vacante.findUnique.mockResolvedValue({ titulo: 'Analista', estado: 'ABIERTA', empresaId: 4 });
   db.postulacion.findUnique.mockResolvedValue(null);
+  db.postulacion.findMany.mockResolvedValue([]);
   db.postulacion.create.mockImplementation(async ({ data }) => ({ id: 11, ...data, egresado: { nombres: 'Laura' } }));
   db.notificacion.create.mockResolvedValue({ id: 1 });
 });
@@ -81,6 +82,20 @@ describe('una sesión que no es de egresado no entra en las rutas del egresado',
     const res = await llamar('post', '/api/postulaciones/enviar', { vacanteId: 5, egresadoId: 3 });
     expect(res.status).toBeGreaterThanOrEqual(401);
     expect(res.status).toBeLessThan(404);
+    expect(llamadasALaBase()).toBe(0);
+  });
+});
+
+// Cualquier sesión leía las postulaciones de cualquier egresado (id de la URL, con
+// la vacante entera). Ninguna pantalla la usaba: se eliminó.
+describe('GET /api/estudiantes/usuario/:usuarioId ya no existe', () => {
+  it.each([
+    ['el propio egresado', EGRESADO_MISMO_ID],
+    ['otro egresado', () => firmar({ id: 8, rol: 'egresado' })],
+    ['una empresa', EMPRESA_DUENA],
+  ])('con token de %s: 404 sin consultar la base', async (_quien, token) => {
+    const res = await llamar('get', '/api/estudiantes/usuario/3', null, token());
+    expect(res.status).toBe(404);
     expect(llamadasALaBase()).toBe(0);
   });
 });

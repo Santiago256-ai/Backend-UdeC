@@ -39,22 +39,7 @@ router.post("/guardar-cv", soloEgresado, guardarCV);
 
 // --- RUTAS DE POSTULACIÓN ---
 
-// 1. Ver mis postulaciones
-router.get("/usuario/:usuarioId", authMiddleware, async (req, res) => {
-    try {
-        const uId = parseInt(req.params.usuarioId);
-        const postulaciones = await prisma.postulacion.findMany({
-            where: { egresadoId: uId },
-            include: { vacante: true },
-        });
-        res.json(postulaciones);
-    } catch (error) {
-        res.status(500).json({ error: "Error al obtener postulaciones" });
-    }
-});
-
-// 2. Postularse a una vacante
-// 2. Postularse a una vacante (VERSIÓN ACTUALIZADA CON NOTIFICACIONES)
+// Postularse a una vacante (con notificación a la empresa)
 router.post("/:vacanteId/postular", soloEgresado, async (req, res) => {
     try {
         const { telefono } = req.body;

@@ -73,17 +73,6 @@ app.get("/", (req, res) => {
     res.send("Backend UdeC API funcionando 🚀 (Prisma Client Activo)");
 });
 
-// Ruta de prueba unificada con Prisma
-app.get("/users", async (req, res) => {
-    try {
-        const result = await prisma.usuario.findMany(); // Cambiado de pool.query a Prisma
-        res.json(result);
-    } catch (err) {
-        console.error(err);
-        res.status(500).send("Error al obtener usuarios desde Prisma");
-    }
-});
-
 // Rutas API (Asegúrate de que el Frontend use el prefijo /api)
 app.use("/api/auth", authRoutes); 
 app.use("/api/vacantes", vacantesRoutes);

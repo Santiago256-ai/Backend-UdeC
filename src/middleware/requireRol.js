@@ -12,9 +12,12 @@ import prisma from "../prismaClient.js";
 // (aud "admin", sub = id del Administrador) y comprueba en cada petición que la
 // cuenta exista y siga activa: desactivarla corta el acceso sin esperar a que el
 // token venza. Deja la cuenta en req.admin ({ id, usuario, nombre }).
+// Cuenta desactivada o eliminada: 401 con { codigo: "sesion_invalida" }, igual en
+// los dos casos (no revela cuál fue), para que el panel limpie la sesión.
 // Los tokens con aud "admin" no valen para ningún otro rol.
 
 const NEGADO = { error: "No tienes permiso para realizar esta acción." };
+const SESION_INVALIDA = { codigo: "sesion_invalida" };
 
 const esTokenDeAdmin = (usuario) =>
     usuario?.aud === "admin" || (Array.isArray(usuario?.aud) && usuario.aud.includes("admin"));
@@ -40,7 +43,7 @@ export const requireRol = (...roles) => async (req, res, next) => {
             where: { id },
             select: { id: true, usuario: true, nombre: true, activo: true }
         });
-        if (!admin?.activo) return res.status(403).json(NEGADO);
+        if (!admin?.activo) return res.status(401).json(SESION_INVALIDA);
 
         req.admin = { id: admin.id, usuario: admin.usuario, nombre: admin.nombre };
         next();

@@ -2,7 +2,8 @@
 // Además del rol, exige el token que emite POST /api/auth/admin/login (aud
 // "admin", sub = id del Administrador) y comprueba en cada petición que la cuenta
 // exista y siga activa: desactivarla corta el acceso sin esperar a que venza el
-// token. Los tokens de admin no sirven en las rutas de egresado ni de empresa.
+// token (401 { codigo: "sesion_invalida" }, igual si la cuenta ya no existe).
+// Los tokens de admin no sirven en las rutas de egresado ni de empresa.
 // Todavía no protege ninguna ruta real (eso es la fase 3): se prueba sobre una
 // ruta de ensayo, y las rutas reales se prueban con el token de admin.
 // Prisma, Supabase y el correo están simulados: no hay base de datos, red ni envíos.
@@ -72,13 +73,17 @@ describe("requireRol('admin')", () => {
     expect(select.password).toBeFalsy();
   });
 
-  it('admin inactivo → 403', async () => {
+  it('admin inactivo → 401 { codigo: "sesion_invalida" }', async () => {
     db.administrador.findUnique.mockResolvedValue({ ...ADMIN_ACTIVO, activo: false });
-    expect((await pedir('/ensayo/admin', TOKEN_ADMIN())).status).toBe(403);
+    const res = await pedir('/ensayo/admin', TOKEN_ADMIN());
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ codigo: 'sesion_invalida' });
   });
 
-  it('admin que ya no existe → 403', async () => {
-    expect((await pedir('/ensayo/admin', firmarAdmin({}, { subject: '99' }))).status).toBe(403);
+  it('admin que ya no existe → el mismo 401 con el mismo cuerpo', async () => {
+    const res = await pedir('/ensayo/admin', firmarAdmin({}, { subject: '99' }));
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ codigo: 'sesion_invalida' });
   });
 
   it('token de egresado con el rol cambiado a "admin" pero sin aud → 403, sin consultar la base', async () => {

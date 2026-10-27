@@ -1,6 +1,29 @@
 import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
+// Ronda "dueño" (2026-10): crear, editar, mandar a la papelera, reactivar y borrar
+// definitivamente exigen una sesión de empresa (authMiddleware + requireRol("empresa")
+// en vacantesRoutes.js) y sólo actúan sobre vacantes de esa empresa. Se comprueban
+// el rol Y el id: los ids de egresados, empresas y administradores se repiten entre
+// tablas. Una vacante ajena o inexistente responde el mismo 404.
+const NO_ENCONTRADA = { error: "Vacante no encontrada." };
+
+// Estados que la empresa puede poner al editar. ELIMINADA sólo se pone con
+// DELETE /:id (papelera); un estado que no cambia se acepta tal cual, porque el
+// formulario de edición reenvía la vacante entera.
+const ESTADOS_EDITABLES = ["ABIERTA", "CERRADA", "DESACTIVADA"];
+
+const vacanteDeLaEmpresa = async (req) => {
+    if (req.user?.rol !== "empresa") return null;
+    const id = Number(req.params.id);
+    if (!Number.isSafeInteger(id) || id <= 0) return null;
+    const vacante = await prisma.vacante.findUnique({
+        where: { id },
+        select: { id: true, empresaId: true, estado: true }
+    });
+    return vacante && vacante.empresaId === req.user.id ? vacante : null;
+};
+
 // 🟢 1. Crear una nueva vacante (CORREGIDO con límites y validación de empresa)
 // 🟢 1. Crear una nueva vacante (ACTUALIZADO con nuevos campos)
 export const crearVacante = async (req, res) => {
@@ -17,10 +40,9 @@ export const crearVacante = async (req, res) => {
             tipoSalario,  // 🆕 Nuevo
             salario,
             horario,      // 🆕 Nuevo
-            empresaId,
             fechaCierre,
-            limitePostulantes 
-        } = req.body;
+            limitePostulantes
+        } = req.body; // un empresaId en el cuerpo se ignora: la empresa sale del token
 
         // --- INICIO DE VALIDACIÓN MEJORADA ---
 
@@ -30,12 +52,11 @@ export const crearVacante = async (req, res) => {
             return res.status(400).json({ error: "Faltan campos obligatorios para publicar la vacante." });
         }
         
-        // 2. VALIDACIÓN CRÍTICA: ID de la Empresa
-        const idEmpresaNumerico = parseInt(empresaId);
-        if (!empresaId || isNaN(idEmpresaNumerico) || idEmpresaNumerico <= 0) {
-            console.error(`❌ ERROR 401: ID de empresa inválido. Valor: ${empresaId}`);
-            return res.status(401).json({ error: "No autorizado. Sesión de empresa no válida." });
+        // 2. La empresa es la de la sesión (requireRol("empresa") ya filtró el rol).
+        if (req.user?.rol !== "empresa" || !Number.isSafeInteger(req.user.id)) {
+            return res.status(403).json({ error: "Sólo una empresa puede publicar vacantes." });
         }
+        const idEmpresaNumerico = req.user.id;
 
         // --- FIN DE VALIDACIÓN ---
 
@@ -167,22 +188,18 @@ export const listarVacantes = async (req, res) => {
 // 🔴 4. Eliminar una vacante (Ahora es un BORRADO LÓGICO / SOFT DELETE)
 export const eliminarVacante = async (req, res) => {
     try {
-        const { id } = req.params;
-        const idNumerico = parseInt(id);
-
-        if (isNaN(idNumerico)) {
-            return res.status(400).json({ error: "ID inválido." });
-        }
+        const vacante = await vacanteDeLaEmpresa(req);
+        if (!vacante) return res.status(404).json(NO_ENCONTRADA);
 
         // En lugar de borrar, ACTUALIZAMOS el estado
         const vacanteEliminada = await prisma.vacante.update({
-            where: { id: idNumerico },
+            where: { id: vacante.id },
             data: { 
                 estado: "ELIMINADA" // <-- Este cambio la "mueve" de vista
             },
         });
 
-        console.log("♻️ Vacante movida a la papelera:", idNumerico);
+        console.log("♻️ Vacante movida a la papelera:", vacante.id);
         res.json({ message: "Vacante movida a la papelera correctamente.", vacante: vacanteEliminada });
 
     } catch (error) {
@@ -194,9 +211,11 @@ export const eliminarVacante = async (req, res) => {
 // 🟢 NUEVO: Función para Reactivar Vacante (El botón de "Rehacer" de tu frontend)
 export const reactivarVacante = async (req, res) => {
     try {
-        const { id } = req.params;
+        const vacante = await vacanteDeLaEmpresa(req);
+        if (!vacante) return res.status(404).json(NO_ENCONTRADA);
+
         await prisma.vacante.update({
-            where: { id: parseInt(id) },
+            where: { id: vacante.id },
             data: { estado: "ABIERTA" }
         });
         res.json({ message: "Vacante reactivada correctamente" });
@@ -208,8 +227,9 @@ export const reactivarVacante = async (req, res) => {
 // 💀 NUEVO: Función para Borrado Definitivo (El icono rojo de la papelera)
 export const eliminarDefinitivamente = async (req, res) => {
     try {
-        const { id } = req.params;
-        const idNumerico = parseInt(id);
+        const vacante = await vacanteDeLaEmpresa(req);
+        if (!vacante) return res.status(404).json(NO_ENCONTRADA);
+        const idNumerico = vacante.id;
 
         // Borramos postulaciones primero por la clave foránea
         await prisma.postulacion.deleteMany({ where: { vacanteId: idNumerico } });
@@ -228,22 +248,22 @@ export const eliminarDefinitivamente = async (req, res) => {
 // 🔵 5. Actualizar una vacante existente
 export const actualizarVacante = async (req, res) => {
     try {
-        const { id } = req.params;
-        const idNumerico = parseInt(id);
-
-        if (isNaN(idNumerico)) {
-            return res.status(400).json({ error: "ID de vacante inválido." });
-        }
+        const vacante = await vacanteDeLaEmpresa(req);
+        if (!vacante) return res.status(404).json(NO_ENCONTRADA);
 
         // 🚨 Quitamos 'activa' de aquí
-        const { 
-            titulo, descripcion, ubicacion, tipo, 
-            jornada, modalidad, tipoSalario, salario, 
-            horario, fechaCierre, limitePostulantes, estado 
+        const {
+            titulo, descripcion, ubicacion, tipo,
+            jornada, modalidad, tipoSalario, salario,
+            horario, fechaCierre, limitePostulantes, estado
         } = req.body;
 
+        if (estado !== undefined && estado !== vacante.estado && !ESTADOS_EDITABLES.includes(estado)) {
+            return res.status(400).json({ error: "Estado de vacante no permitido." });
+        }
+
         const vacanteActualizada = await prisma.vacante.update({
-            where: { id: idNumerico },
+            where: { id: vacante.id },
             data: {
                 titulo: titulo !== undefined ? titulo : undefined,
                 descripcion: descripcion !== undefined ? descripcion : undefined,

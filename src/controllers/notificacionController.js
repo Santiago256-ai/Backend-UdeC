@@ -51,29 +51,31 @@ export const eliminarNotificacion = async (req, res) => {
 };
 
 // Obtener notificaciones para una empresa específica
-// Obtener notificaciones para una empresa específica
 export const obtenerNotificacionesEmpresa = async (req, res) => {
     try {
-        const { empresaId } = req.params;
+        // Sólo la propia empresa (requireRol("empresa") ya filtró el rol). Otra
+        // empresa, una inexistente o un id que no es número: el mismo 404.
+        const empresaId = Number(req.params.empresaId);
+        if (req.user?.rol !== "empresa" || !Number.isSafeInteger(req.user.id) || empresaId !== req.user.id) {
+            return res.status(404).json({ error: "Empresa no encontrada." });
+        }
 
         const notificaciones = await prisma.notificacion.findMany({
             where: {
-                empresaId: parseInt(empresaId) // Filtro directo ahora que existe en el Schema
+                empresaId // Filtro directo ahora que existe en el Schema
             },
-            include: {
-                egresado: {
-                    select: {
-                        nombres: true,
-                        apellidos: true
-                    }
-                },
-                postulacion: {
-                    include: {
-                        vacante: {
-                            select: { titulo: true }
-                        }
-                    }
-                }
+            // Sólo lo que leen NotificacionesEmpresa y el punto de pendientes del
+            // panel. Sin la fila de la postulación (teléfono, calificación, comentario).
+            select: {
+                id: true,
+                tipo: true,
+                contenido: true,
+                fecha: true,
+                vista: true,
+                referenciaId: true,
+                postulacionId: true,
+                mensajeId: true,
+                egresadoId: true
             },
             orderBy: {
                 fecha: 'desc'

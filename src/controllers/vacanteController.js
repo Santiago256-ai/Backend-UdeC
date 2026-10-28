@@ -444,11 +444,11 @@ export const obtenerEstadisticasAdmin = async (req, res) => {
 // 🟢 NUEVO: Dashboard de Métricas PRO para la Empresa
 export const obtenerDashboardMetricasPro = async (req, res) => {
     try {
-        const { id } = req.params; // Ojo: en tu ruta actual recibes el ID de la empresa aquí
-        const empresaIdNumerico = parseInt(id);
-
-        if (isNaN(empresaIdNumerico)) {
-            return res.status(400).json({ error: "ID de empresa inválido." });
+        // Sólo la propia empresa (requireRol("empresa") ya filtró el rol). Otra
+        // empresa, una inexistente o un id que no es número: el mismo 404.
+        const empresaIdNumerico = Number(req.params.id);
+        if (req.user?.rol !== "empresa" || !Number.isSafeInteger(req.user.id) || empresaIdNumerico !== req.user.id) {
+            return res.status(404).json({ error: "Empresa no encontrada." });
         }
 
         // 1. Todas las vacantes para KPIs y Gráficos
@@ -458,12 +458,15 @@ export const obtenerDashboardMetricasPro = async (req, res) => {
             include: { _count: { select: { postulaciones: true } } }
         });
 
-        // 2. Últimas 5 Postulaciones (Relacional: Vacante -> Empresa)
+        // 2. Últimas 5 Postulaciones (Relacional: Vacante -> Empresa). Sólo lo que
+        // lee EmpresaMetricas: sin teléfono, calificación ni comentario.
         const postulacionesRecientes = await prisma.postulacion.findMany({
             where: { vacante: { empresaId: empresaIdNumerico } },
             orderBy: { fecha: 'desc' },
             take: 5,
-            include: {
+            select: {
+                id: true,
+                fecha: true,
                 vacante: { select: { titulo: true } },
                 egresado: { select: { nombres: true, apellidos: true } }
             }
@@ -473,7 +476,8 @@ export const obtenerDashboardMetricasPro = async (req, res) => {
         const notificacionesRecientes = await prisma.notificacion.findMany({
             where: { empresaId: empresaIdNumerico },
             orderBy: { fecha: 'desc' },
-            take: 5
+            take: 5,
+            select: { id: true, contenido: true, fecha: true }
         });
 
         res.json({

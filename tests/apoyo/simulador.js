@@ -7,6 +7,7 @@ import jwt from 'jsonwebtoken';
 const RELACIONES = new Set([
   'empresa', 'vacante', 'vacantes', 'postulaciones', 'egresado', 'cv',
   'educacion', 'experiencia', 'aptitudes', 'idiomas', 'referencias', '_count',
+  'postulacion', 'mensaje',
 ]);
 // (dentro de _count las "relaciones" son números: se tratan como escalares)
 const esRelacion = (fila, k) => RELACIONES.has(k) && typeof fila[k] === 'object' && fila[k] !== null;
@@ -60,4 +61,13 @@ export const postulacionCompleta = ({ id = 11, vacanteId = 5, egresadoId = 7 } =
   calificacionAdmin: 4, comentarioAdmin: 'nota interna', vacanteId, egresadoId,
   egresado: egresadoCompleto(egresadoId),
   vacante: { id: vacanteId, titulo: 'Analista', empresaId: 3, estado: 'ABIERTA', salario: '2000000' },
+});
+
+// Notificación de empresa completa, con sus relaciones (la postulación entera).
+export const notificacionEmpresaCompleta = ({ id = 21, empresaId = 3, egresadoId = 7 } = {}) => ({
+  id, tipo: 'POSTULACION', contenido: 'Laura Gómez se postuló a Analista', fecha: new Date('2026-02-01'),
+  vista: false, referenciaId: 5, mensajeId: null, postulacionId: 11, egresadoId, empresaId,
+  egresado: egresadoCompleto(egresadoId),
+  postulacion: postulacionCompleta({ egresadoId }),
+  mensaje: null,
 });

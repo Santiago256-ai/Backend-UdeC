@@ -1,4 +1,6 @@
 import express from 'express';
+import { authMiddleware } from '../middleware/authMiddleware.js';
+import { requireRol } from '../middleware/requireRol.js';
 import { 
     obtenerNotificacionesEgresado, 
     obtenerNotificacionesEmpresa,
@@ -9,7 +11,8 @@ import {
 const router = express.Router();
 
 router.get('/egresado/:egresadoId', obtenerNotificacionesEgresado);
-router.get("/empresa/:empresaId", obtenerNotificacionesEmpresa);
+// Sólo la propia empresa: el controlador compara :empresaId con el del token.
+router.get("/empresa/:empresaId", authMiddleware, requireRol("empresa"), obtenerNotificacionesEmpresa);
 router.put('/:id/leer', marcarNotificacionLeida);
 
 // --- ESTA ES LA RUTA QUE TE FALTA ---

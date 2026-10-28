@@ -29,8 +29,9 @@ const sesionAdmin = [authMiddleware, requireRol("admin")];
 // 🟢 Crear vacante (POST /)
 router.post("/", sesionEmpresa, crearVacante);
 
-// 🟢 Listar todas las vacantes (GET /)
-router.get("/", listarVacantes); 
+// 🟢 Feed de vacantes (GET /): sesión de egresado; cada vacante trae sólo la
+// postulación de ese egresado, yaPostulado y el total en _count.
+router.get("/", authMiddleware, requireRol("egresado"), listarVacantes);
 
 // --- RUTAS DE ADMINISTRACIÓN GLOBAL ---
 router.get("/admin/todas", sesionAdmin, listarTodasLasVacantesAdmin);

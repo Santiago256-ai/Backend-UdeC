@@ -1,10 +1,10 @@
 // backend/controllers/userController.js
 import { PrismaClient } from "@prisma/client";
+import { ESTADOS_CUENTA, idDeRuta } from "../utils/panelAdmin.js";
 const prisma = new PrismaClient();
 
-// Contención (2026-10): las rutas de administración todavía no exigen rol, así
-// que sólo devuelven los campos que el panel muestra. Nunca password,
-// resetToken, resetTokenExpiry ni firebaseUid.
+// Rutas del panel de administración (sesión de administrador): sólo los campos
+// que el panel muestra. Nunca password, resetToken, resetTokenExpiry ni firebaseUid.
 const CAMPOS_EGRESADO_ADMIN = {
     id: true,
     nombres: true,
@@ -16,6 +16,10 @@ const CAMPOS_EGRESADO_ADMIN = {
     estado: true,
     createdAt: true,
 };
+// Lo único que el modal de edición cambia, menos el correo (cambiarlo y pedir un
+// restablecimiento permitiría tomar la cuenta). El estado se valida aparte.
+const CAMPOS_EGRESADO_EDITABLES = ['nombres', 'apellidos', 'celular', 'facultad', 'programa'];
+const EGRESADO_NO_ENCONTRADO = { error: "El egresado no fue encontrado en la base de datos." };
 
 // ✅ Cambiado a un nombre más descriptivo y correcto
 export const obtenerTodosLosEgresados = async (req, res) => {
@@ -58,50 +62,31 @@ export const eliminarEgresado = async (req, res) => {
 // ✅ Función para que el Admin actualice los datos y el ESTADO del egresado
 export const actualizarEgresadoAdmin = async (req, res) => {
     try {
-        const { id } = req.params;
+        const id = idDeRuta(req.params.id);
+        if (id === null) {
+            return res.status(404).json(EGRESADO_NO_ENCONTRADO);
+        }
 
-        // 1. Sólo los campos permitidos. El correo queda fuera: cambiarlo y pedir
-        // un restablecimiento permitiría tomar la cuenta (el panel lo sigue
-        // enviando y se ignora).
-        const {
-            nombres,
-            apellidos,
-            celular,
-            facultad,
-            programa,
-            estado
-        } = req.body;
+        // 1. Sólo los campos de la lista. El panel envía la fila entera (correo,
+        // _count, createdAt…) y el resto se ignora.
+        const data = {};
+        for (const campo of CAMPOS_EGRESADO_EDITABLES) {
+            if (req.body?.[campo] !== undefined) data[campo] = req.body[campo];
+        }
 
-        // 2. Contención (2026-10): activar o desactivar queda bloqueado hasta que
-        // exista el rol de administrador. El modal de edición reenvía el estado
-        // actual, así que sólo se rechaza un cambio real; el estado nunca se escribe.
+        // 2. Activar o desactivar: sólo ACTIVO o INACTIVO.
+        const { estado } = req.body ?? {};
         if (estado !== undefined) {
-            const actual = await prisma.egresado.findUnique({
-                where: { id: parseInt(id) },
-                select: { estado: true }
-            });
-            if (!actual) {
-                return res.status(404).json({ error: "El egresado no fue encontrado en la base de datos." });
+            if (!ESTADOS_CUENTA.includes(estado)) {
+                return res.status(400).json({ error: "Estado no válido. Usa ACTIVO o INACTIVO." });
             }
-            if (estado !== actual.estado) {
-                return res.status(403).json({
-                    error: "Activar o desactivar egresados está deshabilitado temporalmente mientras se habilita el acceso de administrador."
-                });
-            }
+            data.estado = estado;
         }
 
         // 3. Ejecutamos la actualización en la base de datos (Neon/Prisma)
         const actualizado = await prisma.egresado.update({
-            where: {
-                id: parseInt(id)
-            },
-            data: {
-                nombres,
-                apellidos,
-                celular,
-                facultad,
-                programa
-            },
+            where: { id },
+            data,
             select: CAMPOS_EGRESADO_ADMIN
         });
 
@@ -116,9 +101,7 @@ export const actualizarEgresadoAdmin = async (req, res) => {
         
         // Error P2025: Prisma lanza esto si el registro no existe
         if (error.code === 'P2025') {
-            return res.status(404).json({ 
-                error: "El egresado no fue encontrado en la base de datos." 
-            });
+            return res.status(404).json(EGRESADO_NO_ENCONTRADO);
         }
 
         res.status(500).json({ 

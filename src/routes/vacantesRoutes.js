@@ -41,7 +41,8 @@ router.get("/stats", bloqueoTemporal);
 // ==========================================
 
 // 📊 Dashboard de Métricas PRO (Debe ir antes de cualquier /:id general)
-router.get("/empresa/:id/metricas-pro", obtenerDashboardMetricasPro);
+// Sólo la propia empresa: el controlador compara :id con el del token.
+router.get("/empresa/:id/metricas-pro", sesionEmpresa, obtenerDashboardMetricasPro);
 
 // ✅ Listar vacantes por ID de empresa
 router.get("/empresa/:id", listarVacantesPorEmpresa);

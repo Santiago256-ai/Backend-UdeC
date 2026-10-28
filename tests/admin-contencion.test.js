@@ -2,10 +2,9 @@
 // Prisma está simulado: no hay base de datos ni red. Se montan sólo las rutas
 // de usuarios y empresas sobre un Express de prueba (src/server.js no se carga).
 //
-// Desde la Contención 2 los listados y las ediciones del panel responden 403 en
-// las rutas reales (tests/admin-lecturas.test.js). Sus controladores siguen en el
-// código para volver a montarlos detrás del rol de administrador, así que aquí se
-// prueban montados directamente: lo que devuelven y lo que dejan escribir.
+// Las rutas reales exigen sesión de administrador (tests/admin-lecturas.test.js y
+// tests/panel-admin.test.js). Aquí los controladores se prueban montados
+// directamente: lo que devuelven y lo que dejan escribir.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
@@ -23,7 +22,7 @@ const { obtenerEmpresasParaAdmin, actualizarEmpresaAdmin } = await import('../sr
 
 const app = express();
 app.use(express.json());
-// Controladores del panel montados sin la ruta real (que hoy responde 403).
+// Controladores del panel montados sin la ruta real (que exige sesión de administrador).
 app.get('/api/usuarios/admin/todos', obtenerTodosLosEgresados);
 app.put('/api/usuarios/:id', actualizarEgresadoAdmin);
 app.get('/api/empresas/admin/todas', obtenerEmpresasParaAdmin);
@@ -74,15 +73,16 @@ describe('obtenerTodosLosEgresados (controlador de GET /api/usuarios/admin/todos
 });
 
 describe('actualizarEgresadoAdmin (controlador de PUT /api/usuarios/:id)', () => {
-  it('ignora correo, password, resetToken, resetTokenExpiry y firebaseUid', async () => {
+  it('ignora correo, password, resetToken, resetTokenExpiry, firebaseUid, rol e id', async () => {
     const res = await request(app).put('/api/usuarios/7').send({
       nombres: 'Laura M.', apellidos: 'Gómez', celular: '3111111111', facultad: 'Ingeniería', programa: 'Sistemas',
       estado: 'ACTIVO', correo: 'otro@ejemplo.com', password: 'x', resetToken: 'y', resetTokenExpiry: '2099-01-01', firebaseUid: 'z',
+      rol: 'admin', id: 99,
     });
     expect(res.status).toBe(200);
     const { data, select, where } = db.egresado.update.mock.calls[0][0];
     expect(where).toEqual({ id: 7 });
-    expect(Object.keys(data).sort()).toEqual(['apellidos', 'celular', 'facultad', 'nombres', 'programa']);
+    expect(Object.keys(data).sort()).toEqual(['apellidos', 'celular', 'estado', 'facultad', 'nombres', 'programa']);
     expect(sinCampos(select, PROHIBIDOS)).toEqual([]);
     expect(sinCampos(res.body.usuario, PROHIBIDOS)).toEqual([]);
   });
@@ -93,10 +93,17 @@ describe('actualizarEgresadoAdmin (controlador de PUT /api/usuarios/:id)', () =>
     expect(db.egresado.update.mock.calls[0][0].data.nombres).toBe('Laura');
   });
 
-  // Opción A: activar o desactivar queda bloqueado hasta que exista el rol.
-  it('rechaza con 403 un cambio de estado (botón activar/desactivar) y no escribe nada', async () => {
+  it('activar o desactivar escribe el estado (botón del panel)', async () => {
     const res = await request(app).put('/api/usuarios/7').send({ ...filaCompleta, estado: 'INACTIVO' });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
+    expect(db.egresado.update.mock.calls[0][0].data.estado).toBe('INACTIVO');
+  });
+
+  it('rechaza con 400 un estado que no es ACTIVO ni INACTIVO y no escribe nada', async () => {
+    for (const estado of ['BORRADO', 'activo', '', null, 1]) {
+      const res = await request(app).put('/api/usuarios/7').send({ nombres: 'Laura', estado });
+      expect(res.status).toBe(400);
+    }
     expect(db.egresado.update).not.toHaveBeenCalled();
   });
 
@@ -158,7 +165,7 @@ describe('actualizarEmpresaAdmin (controlador de PUT /api/empresas/admin/:id)', 
 });
 
 describe('PUT /api/empresas/admin/estado/:id', () => {
-  it('responde 403 y no cambia el estado', async () => {
+  it('sin token responde 403 y no cambia el estado', async () => {
     const res = await request(appRutas).put('/api/empresas/admin/estado/7').send({ estado: 'INACTIVO' });
     expect(res.status).toBe(403);
     expect(db.empresa.update).not.toHaveBeenCalled();

@@ -145,3 +145,26 @@ describe('POST /api/auth/login (egresado / empresa) no cambia', () => {
     expect(db.administrador.findUnique).not.toHaveBeenCalled();
   });
 });
+
+// El límite de intentos del Firewall de Vercel compara la ruta exacta. Express no
+// distingue mayúsculas ni la barra final: cualquier otra forma de la ruta sigue
+// como una ruta desconocida (404), sin consultar la tabla ni comparar contraseñas.
+describe('POST /api/auth/admin/login — sólo con la ruta exacta', () => {
+  it.each([
+    '/api/auth/admin/login/',
+    '/API/auth/admin/login',
+    '/api/auth/admin/LOGIN',
+    '/api/Auth/Admin/Login',
+  ])('%s responde 404 y no consulta', async (ruta) => {
+    const res = await request(app).post(ruta).send({ usuario: 'admin.ops', password: CLAVE });
+    expect(res.status).toBe(404);
+    expect(res.body.token).toBeUndefined();
+    expect(db.administrador.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('la ruta exacta con query sigue funcionando', async () => {
+    const res = await request(app).post('/api/auth/admin/login?origen=panel').send({ usuario: 'admin.ops', password: CLAVE });
+    expect(res.status).toBe(200);
+    expect(typeof res.body.token).toBe('string');
+  });
+});

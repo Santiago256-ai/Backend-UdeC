@@ -1,10 +1,11 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from 'bcryptjs'; 
 import jwt from 'jsonwebtoken'; 
+import { ESTADOS_CUENTA, idDeRuta } from "../utils/panelAdmin.js";
 const prisma = new PrismaClient();
 
-// Contención (2026-10): las rutas de administración todavía no exigen rol, así
-// que sólo devuelven los campos que el panel muestra (lista y modal de detalle).
+// Rutas del panel de administración (sesión de administrador): sólo los campos
+// que el panel muestra (lista y modal de detalle).
 // Nunca password, resetToken, resetTokenExpiry ni datos financieros.
 const CAMPOS_EMPRESA_ADMIN = {
     id: true,
@@ -20,6 +21,7 @@ const CAMPOS_EMPRESA_ADMIN = {
     estado: true,
     createdAt: true,
 };
+const EMPRESA_NO_ENCONTRADA = { error: "Empresa no encontrada." };
 // Lo único que el modal de detalle edita, menos el correo (cambiarlo y pedir un
 // restablecimiento permitiría tomar la cuenta).
 const CAMPOS_EMPRESA_EDITABLES = ['nombre', 'nit', 'phones', 'contactName', 'address', 'city', 'economicSector', 'employees'];
@@ -336,11 +338,16 @@ export const actualizarEmpresa = async (req, res) => {
 // 🟢 NUEVO: Cambiar estado (Activo/Inactivo) desde la tabla de Admin
 export const actualizarEstadoEmpresaAdmin = async (req, res) => {
     try {
-        const { id } = req.params;
-        const { estado } = req.body; // Recibe "ACTIVO" o "INACTIVO"
+        const id = idDeRuta(req.params.id);
+        if (id === null) return res.status(404).json(EMPRESA_NO_ENCONTRADA);
+
+        const { estado } = req.body ?? {}; // Recibe "ACTIVO" o "INACTIVO"
+        if (!ESTADOS_CUENTA.includes(estado)) {
+            return res.status(400).json({ error: "Estado no válido. Usa ACTIVO o INACTIVO." });
+        }
 
         const actualizada = await prisma.empresa.update({
-            where: { id: parseInt(id) },
+            where: { id },
             data: { estado },
             select: CAMPOS_EMPRESA_ADMIN
         });
@@ -348,6 +355,7 @@ export const actualizarEstadoEmpresaAdmin = async (req, res) => {
         res.json({ message: "Estado de empresa actualizado", empresa: actualizada });
     } catch (error) {
         console.error("❌ Error al cambiar estado de empresa:", error);
+        if (error.code === 'P2025') return res.status(404).json(EMPRESA_NO_ENCONTRADA);
         res.status(500).json({ error: "No se pudo cambiar el estado." });
     }
 };
@@ -355,8 +363,8 @@ export const actualizarEstadoEmpresaAdmin = async (req, res) => {
 // 🟢 NUEVO: Función para que el Admin edite cualquier empresa sin restricción de ID
 export const actualizarEmpresaAdmin = async (req, res) => {
     try {
-        const { id } = req.params;
-        const idNumerico = parseInt(id);
+        const idNumerico = idDeRuta(req.params.id);
+        if (idNumerico === null) return res.status(404).json(EMPRESA_NO_ENCONTRADA);
         // 🛡️ Lista explícita: cualquier otro campo del cuerpo (email, password,
         // resetToken, resetTokenExpiry, estado, _count…) se ignora.
         const dataToUpdate = {};
@@ -370,7 +378,7 @@ export const actualizarEmpresaAdmin = async (req, res) => {
             select: CAMPOS_EMPRESA_ADMIN
         });
 
-        console.log(`✅ Expediente de empresa ID ${id} actualizado por ADMIN.`);
+        console.log(`✅ Expediente de empresa ID ${idNumerico} actualizado por ADMIN.`);
         res.json({ 
             message: "Expediente actualizado con éxito", 
             empresa: empresaActualizada 
@@ -382,6 +390,7 @@ export const actualizarEmpresaAdmin = async (req, res) => {
         if (error.code === 'P2002') {
             return res.status(409).json({ error: "El NIT ingresado ya está registrado en otra empresa." });
         }
+        if (error.code === 'P2025') return res.status(404).json(EMPRESA_NO_ENCONTRADA);
 
         res.status(500).json({ error: "No se pudo actualizar la información de la empresa." });
     }

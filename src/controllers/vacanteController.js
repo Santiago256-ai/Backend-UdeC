@@ -292,13 +292,15 @@ export const actualizarVacante = async (req, res) => {
 
 export const listarTodasLasVacantesAdmin = async (req, res) => {
     try {
+        // Sólo lo que leen ItemVacantes y el Inicio del panel.
         const vacantes = await prisma.vacante.findMany({
-            include: {
+            select: {
+                id: true,
+                titulo: true,
+                ubicacion: true,
+                estado: true,
                 empresa: {
-                    select: {
-                        nombre: true,
-                        nit: true
-                    }
+                    select: { nombre: true }
                 }
             },
             orderBy: { fechaCreacion: "desc" },
@@ -434,10 +436,7 @@ export const obtenerEstadisticasAdmin = async (req, res) => {
 
     } catch (error) {
         console.error("❌ Error en estadísticas completas:", error.message);
-        res.status(500).json({ 
-            error: "Error al obtener estadísticas", 
-            detalle: error.message 
-        });
+        res.status(500).json({ error: "Error al obtener estadísticas" });
     }
 };
 

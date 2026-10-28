@@ -1,7 +1,6 @@
 import express from "express";
 import multer from "multer";
 import { authMiddleware } from "../middleware/authMiddleware.js";
-import { bloqueoTemporal } from "../middleware/bloqueoTemporal.js";
 import { requireRol } from "../middleware/requireRol.js";
 import {
     crearPostulacion,
@@ -10,8 +9,9 @@ import {
     actualizarAnclajePostulacion,
     // --- NUEVAS IMPORTACIONES ---
     obtenerPostulacionesPorEmpresa, 
-    calificarPostulacion 
+    calificarPostulacion,
     // ----------------------------
+    obtenerTodasLasPostulacionesAdmin
 } from "../controllers/postulacionController.js"; 
 
 const router = express.Router();
@@ -52,9 +52,7 @@ router.put("/:id/anclaje", authMiddleware, actualizarAnclajePostulacion);
 router.put("/calificar/:id", authMiddleware, calificarPostulacion);
 
 // --- PERFIL ADMINISTRADOR (UdeC) ---
-// obtenerDetallePostulacionesAdmin y obtenerTodasLasPostulacionesAdmin, hasta que
-// exista el rol de administrador
-router.get("/admin/detalle-completo/:vacanteId", bloqueoTemporal);
-router.get("/admin/todas", bloqueoTemporal);
+// Sesión de administrador activa.
+router.get("/admin/todas", authMiddleware, requireRol("admin"), obtenerTodasLasPostulacionesAdmin);
 
 export default router;

@@ -1,6 +1,7 @@
-// Contención 2 (2026-10): lecturas y ediciones del panel de administración.
-// Mientras no exista el rol de administrador responden 403 a cualquiera (con o
-// sin token, de egresado o de empresa) y no llegan a consultar la base.
+// Lecturas y ediciones del panel de administración (Contención 2, 2026-10; desde
+// la ronda del panel exigen sesión de administrador). Sin token o con token de
+// egresado o de empresa responden 403 y no llegan a consultar la base. Lo que
+// pasa con un token de administrador está en tests/panel-admin.test.js.
 // Prisma está simulado: no hay base de datos ni red.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
@@ -11,7 +12,10 @@ const db = vi.hoisted(() => {
   const modelo = () => ({
     findMany: vi.fn(), findUnique: vi.fn(), count: vi.fn(), groupBy: vi.fn(), update: vi.fn(),
   });
-  return { egresado: modelo(), empresa: modelo(), vacante: modelo(), postulacion: modelo() };
+  return {
+    egresado: modelo(), empresa: modelo(), vacante: modelo(), postulacion: modelo(),
+    administrador: modelo(),
+  };
 });
 vi.mock('@prisma/client', () => ({ PrismaClient: vi.fn(() => db) }));
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn(() => ({})) }));
@@ -49,11 +53,11 @@ const RUTAS = [
   ['get', '/api/usuarios/admin/todos'],
   ['get', '/api/empresas/admin/todas'],
   ['get', '/api/postulaciones/admin/todas'],
-  ['get', '/api/postulaciones/admin/detalle-completo/5'],
   ['get', '/api/vacantes/admin/todas'],
   ['get', '/api/vacantes/stats'],
   ['put', '/api/usuarios/7'],
   ['put', '/api/empresas/admin/3'],
+  ['put', '/api/empresas/admin/estado/3'],
 ];
 
 const SESIONES = [
@@ -62,14 +66,13 @@ const SESIONES = [
   ['con token de egresado', EGRESADO_MISMO_ID],
 ];
 
-describe.each(RUTAS)('%s %s (administración, bloqueo temporal)', (metodo, ruta) => {
+describe.each(RUTAS)('%s %s (administración, sin sesión de administrador)', (metodo, ruta) => {
   it.each(SESIONES)('%s responde 403 y no consulta la base', async (_, token) => {
     let peticion = request(app)[metodo](ruta);
     if (token) peticion = peticion.set('Authorization', token());
     if (metodo === 'put') peticion = peticion.send({ nombres: 'Otro', nombre: 'Otra', estado: 'ACTIVO' });
     const res = await peticion;
     expect(res.status).toBe(403);
-    expect(res.body.error).toMatch(/deshabilitada temporalmente/);
     expect(llamadasALaBase()).toBe(0);
   });
 });

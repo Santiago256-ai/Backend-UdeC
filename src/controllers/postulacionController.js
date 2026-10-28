@@ -233,49 +233,17 @@ res.json({ id: postulacionActualizada.id, estado: postulacionActualizada.estado 
     }
 };
 
-// postulacionController.js
-
-export const obtenerDetallePostulacionesAdmin = async (req, res) => {
-    try {
-        const { vacanteId } = req.params;
-
-        const postulaciones = await prisma.postulacion.findMany({
-            where: { 
-                vacanteId: parseInt(vacanteId) 
-            },
-            include: {
-                egresado: {
-                    select: {
-                        nombres: true,
-                        apellidos: true,
-                        correo: true,
-                        cv: {
-                            include: {
-                                educacion: true,
-                                experiencia: true,
-                                aptitudes: true,
-                                idiomas: true,
-                                referencias: true
-                            }
-                        }
-                    }
-                }
-            },
-            orderBy: { fecha: "desc" }
-        });
-
-        res.json(postulaciones);
-    } catch (error) {
-        console.error("❌ Error Admin Postulaciones:", error.message);
-        res.status(500).json({ error: "Error al obtener el listado maestro de candidatos." });
-    }
-};
-
 // 🟢 NUEVO: Obtener TODAS las postulaciones del sistema (Vista Global Admin)
 export const obtenerTodasLasPostulacionesAdmin = async (req, res) => {
     try {
+        // Sólo lo que lee ItemPostulaciones del panel: sin teléfono, chat ni anclaje.
         const postulaciones = await prisma.postulacion.findMany({
-            include: {
+            select: {
+                id: true,
+                estado: true,
+                fecha: true,
+                calificacionAdmin: true,
+                comentarioAdmin: true,
                 egresado: {
                     select: { nombres: true, apellidos: true, correo: true }
                 },

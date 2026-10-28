@@ -1,6 +1,5 @@
 import express from "express";
 import { authMiddleware } from "../middleware/authMiddleware.js";
-import { bloqueoTemporal } from "../middleware/bloqueoTemporal.js";
 import { requireRol } from "../middleware/requireRol.js";
 import {
     crearVacante,
@@ -10,7 +9,9 @@ import {
     actualizarVacante,
     reactivarVacante,
     eliminarDefinitivamente,
-    obtenerDashboardMetricasPro
+    obtenerDashboardMetricasPro,
+    listarTodasLasVacantesAdmin,
+    obtenerEstadisticasAdmin
 } from "../controllers/vacanteController.js";
 
 const router = express.Router();
@@ -18,6 +19,8 @@ const router = express.Router();
 // Escritura (ronda "dueño", 2026-10): sesión de empresa; el controlador comprueba
 // además que la vacante sea de esa empresa (ajena o inexistente: el mismo 404).
 const sesionEmpresa = [authMiddleware, requireRol("empresa")];
+// Panel de administración: sesión de administrador activa.
+const sesionAdmin = [authMiddleware, requireRol("admin")];
 
 // ==========================================
 //   1. RUTAS FIJAS O ESPECÍFICAS (Prioridad)
@@ -30,10 +33,8 @@ router.post("/", sesionEmpresa, crearVacante);
 router.get("/", listarVacantes); 
 
 // --- RUTAS DE ADMINISTRACIÓN GLOBAL ---
-// listarTodasLasVacantesAdmin y obtenerEstadisticasAdmin, hasta que exista el rol
-// de administrador
-router.get("/admin/todas", bloqueoTemporal);
-router.get("/stats", bloqueoTemporal);
+router.get("/admin/todas", sesionAdmin, listarTodasLasVacantesAdmin);
+router.get("/stats", sesionAdmin, obtenerEstadisticasAdmin);
 
 
 // ==========================================

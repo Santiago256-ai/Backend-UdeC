@@ -46,7 +46,8 @@ router.get("/stats", sesionAdmin, obtenerEstadisticasAdmin);
 router.get("/empresa/:id/metricas-pro", sesionEmpresa, obtenerDashboardMetricasPro);
 
 // ✅ Listar vacantes por ID de empresa
-router.get("/empresa/:id", listarVacantesPorEmpresa);
+// Sólo la propia empresa: el controlador compara :id con el del token.
+router.get("/empresa/:id", sesionEmpresa, listarVacantesPorEmpresa);
 
 // ♻️ Reactivar una vacante (Mover de Eliminadas a Activas)
 router.put("/:id/reactivar", sesionEmpresa, reactivarVacante);

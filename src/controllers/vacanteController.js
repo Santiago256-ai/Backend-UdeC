@@ -91,12 +91,13 @@ export const crearVacante = async (req, res) => {
 // 🟡 2. Listar vacantes por ID de empresa (DINÁMICO PARA ELIMINADAS)
 export const listarVacantesPorEmpresa = async (req, res) => {
     try {
-        const empresaId = parseInt(req.params.id); 
-        const { estado } = req.query; // Capturamos el ?estado= de la URL
-
-        if (isNaN(empresaId)) {
-            return res.status(400).json({ error: "ID de empresa inválido." });
+        // Sólo la propia empresa (requireRol("empresa") ya filtró el rol). Otra
+        // empresa, una inexistente o un id que no es número: el mismo 404.
+        const empresaId = Number(req.params.id);
+        if (req.user?.rol !== "empresa" || !Number.isSafeInteger(req.user.id) || empresaId !== req.user.id) {
+            return res.status(404).json({ error: "Empresa no encontrada." });
         }
+        const { estado } = req.query; // Capturamos el ?estado= de la URL
 
         // Definimos el filtro base
         let filtro = { empresaId: empresaId };

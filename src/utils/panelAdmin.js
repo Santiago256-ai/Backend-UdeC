@@ -1,4 +1,5 @@
-// Validaciones comunes de las rutas del panel de administración.
+// Validaciones comunes de las rutas del panel de administración (idDeRuta también
+// la usan las rutas de notificaciones).
 
 // Id de la URL como entero positivo, o null (texto, decimales, "3abc"…). El
 // controlador responde entonces el mismo 404 que para un registro inexistente.

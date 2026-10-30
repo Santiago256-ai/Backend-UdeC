@@ -154,7 +154,9 @@ export const login = async (req, res) => {
     });
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    // El detalle sólo en el log del servidor; nunca en la respuesta.
+    console.error("❌ Error en login:", error);
+    res.status(500).json({ success: false, message: "No pudimos iniciar sesión. Intenta de nuevo." });
   }
 };
 

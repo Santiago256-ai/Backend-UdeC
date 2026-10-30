@@ -2,7 +2,8 @@
 // La rama del egresado devolvía la fila entera (hash de la contraseña, token de
 // recuperación y uid de Firebase), y el frontend la guarda en localStorage.
 // Ahora la consulta pide sólo lo necesario y la respuesta lleva sólo lo que lee el
-// frontend. Los mensajes de error no cambian en esta fase.
+// frontend. Los rechazos (todos con la misma respuesta) están en
+// tests/login-uniforme.test.js.
 // Prisma, Firebase y dotenv están simulados: no hay base de datos, red ni .env.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
@@ -69,15 +70,13 @@ describe('POST /api/auth/login — egresado', () => {
     expect(sinCampos(select, ['resetToken', 'resetTokenExpiry', 'firebaseUid'])).toEqual([]);
   });
 
-  it('los mensajes de error no cambian', async () => {
-    expect((await login('laura@ejemplo.com', 'otra')).body).toEqual({ success: false, message: 'Contraseña incorrecta' });
-    expect((await login('nadie@ejemplo.com')).body).toEqual({ success: false, message: 'Credenciales no encontradas' });
-
-    db.egresado.findUnique.mockImplementation(async (consulta) => proyectar({ ...egresadoCompleto(7), estado: 'INACTIVO' }, consulta));
-    expect((await login('laura@ejemplo.com')).body.message).toMatch(/desactivada por el administrador/);
-
-    db.egresado.findUnique.mockImplementation(async (consulta) => proyectar({ ...egresadoCompleto(7), password: null }, consulta));
-    expect((await login('laura@ejemplo.com')).body).toEqual({ success: false, message: 'Inicia sesión con Google.' });
+  it('cuenta inactiva con la contraseña correcta: el texto de siempre, ahora con codigo', async () => {
+    db.egresado.findUnique.mockImplementation(async (consulta) =>
+      proyectar({ ...egresadoCompleto(7), password: HASH, estado: 'INACTIVO' }, consulta));
+    expect((await login('laura@ejemplo.com')).body).toEqual({
+      success: false, codigo: 'cuenta_inactiva',
+      message: 'Tu cuenta ha sido desactivada por el administrador. Contacta con la Universidad.',
+    });
   });
 });
 
@@ -99,9 +98,11 @@ describe('POST /api/auth/login — empresa', () => {
     expect(sinCampos(select, ['resetToken', 'resetTokenExpiry', 'annualRevenue', 'totalAssets', 'equity', 'nit'])).toEqual([]);
   });
 
-  it('los mensajes de error no cambian', async () => {
-    expect((await login('contacto@agroandes.com', 'otra')).body).toEqual({ success: false, message: 'Contraseña incorrecta' });
+  it('cuenta inactiva con la contraseña correcta: el texto de siempre, ahora con codigo', async () => {
     db.empresa.findUnique.mockImplementation(async (consulta) => proyectar({ ...empresaCompleta(), estado: 'INACTIVO' }, consulta));
-    expect((await login('contacto@agroandes.com')).body.message).toMatch(/desactivada por el administrador/);
+    expect((await login('contacto@agroandes.com')).body).toEqual({
+      success: false, codigo: 'cuenta_inactiva',
+      message: 'Tu cuenta de empresa ha sido desactivada por el administrador. Contacta con la Universidad.',
+    });
   });
 });

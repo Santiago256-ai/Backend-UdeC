@@ -140,7 +140,7 @@ describe('POST /api/auth/login (egresado / empresa) no cambia', () => {
     db.egresado.findUnique.mockResolvedValue(null);
     db.empresa.findUnique.mockResolvedValue(null);
     const res = await request(app).post('/api/auth/login').send({ correo: 'admin.ops', password: CLAVE });
-    expect(res.body).toEqual({ success: false, message: 'Credenciales no encontradas' });
+    expect(res.body).toEqual({ success: false, codigo: 'credenciales_invalidas', message: 'Correo o contraseña incorrectos.' });
     expect(res.body.token).toBeUndefined();
     expect(db.administrador.findUnique).not.toHaveBeenCalled();
   });

@@ -56,44 +56,76 @@ export const register = async (req, res) => {
 // =========================================================
 // LOGIN MULTIPERFIL (EGRESADO / EMPRESA)
 // =========================================================
+
+// Hash bcrypt (costo 10, como las cuentas de egresado y empresa: registro y
+// restablecimiento usan 10) de un texto aleatorio que nadie conoce. Si el correo
+// no existe o la cuenta es de Google se compara contra él, para que la respuesta
+// tarde lo mismo que con una contraseña incorrecta.
+const HASH_FICTICIO = "$2a$10$J10d7x2Wwnih.4/x2FJfD.8hlS5qJxbV3HJOyEbYaZgD8m8cBOk6O";
+
+// Correo inexistente, contraseña incorrecta, cuenta de Google y cuenta inactiva con
+// contraseña incorrecta responden exactamente lo mismo: no se revela qué correos
+// están registrados ni el estado de la cuenta.
+const CREDENCIALES_INVALIDAS = {
+    success: false,
+    codigo: "credenciales_invalidas",
+    message: "Correo o contraseña incorrectos."
+};
+
+// Sólo después de una contraseña correcta. El texto se conserva: el frontend
+// reconoce la cuenta desactivada por la palabra "desactivada".
+const CUENTA_INACTIVA = {
+    egresado: "Tu cuenta ha sido desactivada por el administrador. Contacta con la Universidad.",
+    empresa: "Tu cuenta de empresa ha sido desactivada por el administrador. Contacta con la Universidad."
+};
+
 export const login = async (req, res) => {
   try {
-    const { correo, password } = req.body;
-    const identificador = correo.toLowerCase();
+    const { correo, password } = req.body ?? {};
+    const identificador = typeof correo === "string" ? correo.toLowerCase() : "";
 
-    // 1. Buscar en Egresado
+    // 1. Buscar siempre en Egresado y en Empresa, las dos a la vez.
     // Sólo lo que hace falta para validar y lo que lee el frontend de
     // localStorage['usuario']; nunca resetToken ni firebaseUid.
-    let egresado = await prisma.egresado.findUnique({
-        where: { correo: identificador },
-        select: {
-            id: true, nombres: true, apellidos: true, correo: true, celular: true, programa: true,
-            estado: true, password: true,
-        }
-    });
-    
-    if (egresado) {
-        // 🟢 NUEVO: VALIDACIÓN DE ESTADO INACTIVO
-        if (egresado.estado === "INACTIVO") {
-            return res.status(200).json({ 
-                success: false, 
-                message: "Tu cuenta ha sido desactivada por el administrador. Contacta con la Universidad." 
-            });
-        }
+    const [egresado, empresa] = await Promise.all([
+        prisma.egresado.findUnique({
+            where: { correo: identificador },
+            select: {
+                id: true, nombres: true, apellidos: true, correo: true, celular: true, programa: true,
+                estado: true, password: true,
+            }
+        }),
+        prisma.empresa.findUnique({
+            where: { email: identificador },
+            select: { id: true, nombre: true, email: true, estado: true, password: true }
+        })
+    ]);
 
-        if (!egresado.password) {
-            return res.status(200).json({ success: false, message: "Inicia sesión con Google." });
-        }
+    // Si el correo estuviera en las dos tablas, manda el egresado (como antes).
+    const tipo = egresado ? "egresado" : empresa ? "empresa" : null;
+    const cuenta = egresado ?? empresa;
 
-        const passwordValida = await bcrypt.compare(password, egresado.password);
-        if (!passwordValida) return res.status(200).json({ success: false, message: "Contraseña incorrecta" });
+    // 2. Comparar siempre, aunque no haya cuenta o sea de Google (sin contraseña).
+    const passwordValida = await bcrypt.compare(
+        typeof password === "string" ? password : "",
+        cuenta?.password || HASH_FICTICIO
+    );
+    if (!cuenta?.password || !passwordValida) {
+        return res.status(200).json(CREDENCIALES_INVALIDAS);
+    }
 
-        const token = jwt.sign(
-            { id: egresado.id, rol: "egresado" },
-            JWT_SECRET,
-            { expiresIn: "1d" }
-        );
+    // 3. El estado, sólo con la contraseña correcta.
+    if (cuenta.estado === "INACTIVO") {
+        return res.status(200).json({ success: false, codigo: "cuenta_inactiva", message: CUENTA_INACTIVA[tipo] });
+    }
 
+    const token = jwt.sign(
+        { id: cuenta.id, rol: tipo },
+        JWT_SECRET,
+        { expiresIn: "1d" }
+    );
+
+    if (tipo === "egresado") {
         return res.json({ 
             success: true,
             token, 
@@ -109,49 +141,22 @@ export const login = async (req, res) => {
         });
     }
 
-    // 2. Buscar en Empresa usando el identificador normalizado
-// 2. Buscar en Empresa usando el identificador normalizado
-    const empresa = await prisma.empresa.findUnique({
-        where: { email: identificador },
-        select: { id: true, nombre: true, email: true, estado: true, password: true }
+    return res.json({ 
+        success: true,
+        token, 
+        tipo: "empresa", 
+        usuario: {
+            id: empresa.id,
+            nombres: empresa.nombre,
+            correo: empresa.email,
+            rol: "empresa"
+        } 
     });
 
-    if (empresa) {
-        // 🛑 ¡AQUÍ ESTÁ EL MURO DE SEGURIDAD! 🛑
-        // Bloqueamos el paso antes de validar la contraseña
-        if (empresa.estado === "INACTIVO") {
-            return res.status(200).json({ 
-                success: false, 
-                message: "Tu cuenta de empresa ha sido desactivada por el administrador. Contacta con la Universidad." 
-            });
-        }
-
-        const passwordValida = await bcrypt.compare(password, empresa.password);
-        if (!passwordValida) return res.status(200).json({ success: false, message: "Contraseña incorrecta" });
-
-        const token = jwt.sign(
-            { id: empresa.id, rol: "empresa" },
-            JWT_SECRET,
-            { expiresIn: "1d" }
-        );
-
-        return res.json({ 
-            success: true,
-            token, 
-            tipo: "empresa", 
-            usuario: {
-                id: empresa.id,
-                nombres: empresa.nombre,
-                correo: empresa.email,
-                rol: "empresa"
-            } 
-        });
-    }
-
-    return res.status(200).json({ success: false, message: "Credenciales no encontradas" });
-
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    // El detalle sólo en el log del servidor; nunca en la respuesta.
+    console.error("❌ Error en login:", error);
+    res.status(500).json({ success: false, message: "No pudimos iniciar sesión. Intenta de nuevo." });
   }
 };
 

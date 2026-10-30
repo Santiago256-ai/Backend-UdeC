@@ -92,9 +92,13 @@ beforeEach(() => {
   db.empresa.findUnique.mockImplementation(async (args) => proyectar(empresa, args));
 });
 
-describe('GET /api/vacantes (feed público de egresados)', () => {
+// Desde la entrega 3 de la ronda "dueño" el feed exige sesión de egresado: sus
+// pruebas de sesión y de postulaciones ajenas están en tests/egresado-feed.test.js.
+describe('GET /api/vacantes (feed de egresados)', () => {
+  const token = `Bearer ${jwt.sign({ id: 7, rol: 'egresado' }, process.env.JWT_SECRET)}`;
+
   it('de la empresa sólo devuelve id y nombre; nada de secretos ni datos financieros', async () => {
-    const res = await request(app).get('/api/vacantes');
+    const res = await request(app).get('/api/vacantes').set('Authorization', token);
     expect(res.status).toBe(200);
     const { empresa: emp } = res.body[0];
     expect(Object.keys(emp).sort()).toEqual(['id', 'nombre']);
@@ -102,7 +106,7 @@ describe('GET /api/vacantes (feed público de egresados)', () => {
   });
 
   it('mantiene lo que lee el frontend: postulaciones resumidas, _count y datos de la vacante', async () => {
-    const res = await request(app).get('/api/vacantes');
+    const res = await request(app).get('/api/vacantes').set('Authorization', token);
     const v = res.body[0];
     expect(v.titulo).toBe('Analista');
     expect(v.empresaId).toBe(3);

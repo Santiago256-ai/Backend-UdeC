@@ -91,12 +91,13 @@ export const crearVacante = async (req, res) => {
 // 🟡 2. Listar vacantes por ID de empresa (DINÁMICO PARA ELIMINADAS)
 export const listarVacantesPorEmpresa = async (req, res) => {
     try {
-        const empresaId = parseInt(req.params.id); 
-        const { estado } = req.query; // Capturamos el ?estado= de la URL
-
-        if (isNaN(empresaId)) {
-            return res.status(400).json({ error: "ID de empresa inválido." });
+        // Sólo la propia empresa (requireRol("empresa") ya filtró el rol). Otra
+        // empresa, una inexistente o un id que no es número: el mismo 404.
+        const empresaId = Number(req.params.id);
+        if (req.user?.rol !== "empresa" || !Number.isSafeInteger(req.user.id) || empresaId !== req.user.id) {
+            return res.status(404).json({ error: "Empresa no encontrada." });
         }
+        const { estado } = req.query; // Capturamos el ?estado= de la URL
 
         // Definimos el filtro base
         let filtro = { empresaId: empresaId };
@@ -139,6 +140,12 @@ export const listarVacantes = async (req, res) => {
         const hoyInicio = new Date();
         hoyInicio.setHours(0, 0, 0, 0);
 
+        // Sólo el egresado de la sesión (requireRol("egresado") ya filtró el rol).
+        const egresadoId = req.user?.id;
+        if (req.user?.rol !== "egresado" || !Number.isSafeInteger(egresadoId)) {
+            return res.status(403).json({ error: "No tienes permiso para realizar esta acción." });
+        }
+
         const vacantes = await prisma.vacante.findMany({
             where: {
                 estado: "ABIERTA",
@@ -149,13 +156,30 @@ export const listarVacantes = async (req, res) => {
                     { fechaCierre: null }
                 ],
             },
-            include: {
-                // Ruta pública: de la empresa sólo lo que muestra el feed (nombre y
-                // enlace al perfil). Nunca password, resetToken ni datos financieros.
+            // Sólo lo que leen VacantesDashboard, InicioEgresados y SolicitudesEgresado.
+            select: {
+                id: true,
+                titulo: true,
+                descripcion: true,
+                ubicacion: true,
+                tipo: true,
+                jornada: true,
+                modalidad: true,
+                salario: true,
+                horario: true,
+                fechaCreacion: true,
+                fechaCierre: true,
+                limitePostulantes: true,
+                estado: true,
+                empresaId: true,
+                // De la empresa sólo lo que muestra el feed (nombre y enlace al perfil).
                 empresa: {
                     select: { id: true, nombre: true }
                 },
+                // Sólo la postulación del egresado que llama: nunca ids de otros.
+                // El total sigue en _count.
                 postulaciones: {
+                    where: { egresadoId },
                     select: {
                         id: true,
                         egresadoId: true,
@@ -177,7 +201,10 @@ export const listarVacantes = async (req, res) => {
             return vacante._count.postulaciones < vacante.limitePostulantes;
         });
 
-        res.json(vacantesDisponibles);
+        res.json(vacantesDisponibles.map(vacante => ({
+            ...vacante,
+            yaPostulado: vacante.postulaciones.length > 0
+        })));
     } catch (error) {
         console.error("❌ Error al listar vacantes filtradas:", error.message);
         res.status(500).json({ error: "Error interno al listar vacantes." });
